@@ -1,14 +1,14 @@
 """
 Ingestion logic — shared by the CLI script and the /ingest HTTP endpoint.
 """
+
 import json
-import os
 from collections import Counter
 
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
 
-from src.db.vector_store import get_embeddings, _get_client, COLLECTION_NAME
+from src.db.vector_store import COLLECTION_NAME, _get_client, get_embeddings
 
 
 def parse_jsonl(raw: str | bytes) -> list[dict]:
@@ -69,9 +69,7 @@ def ingest_items(items: list[dict], reset: bool = False) -> dict:
     )
     store.add_documents(documents=docs, ids=ids)
 
-    counts = Counter(
-        f"{d.metadata['country']}/{d.metadata['language']}" for d in docs
-    )
+    counts = Counter(f"{d.metadata['country']}/{d.metadata['language']}" for d in docs)
     return {"ingested": len(docs), "breakdown": dict(sorted(counts.items()))}
 
 

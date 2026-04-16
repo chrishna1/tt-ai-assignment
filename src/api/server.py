@@ -12,11 +12,12 @@ POST /ask
 GET /health
     Returns { "status": "ok", "collection_size": int }
 """
+
 import logging
-import os
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+
 from src.api.schema import AskRequest, AskResponse, CitationResponse, TraceResponse
 
 load_dotenv()
@@ -51,10 +52,16 @@ async def ingest_endpoint(
     if not raw.strip():
         raise HTTPException(status_code=400, detail="Uploaded file is empty")
 
-    logger.info("Ingest request | file=%s reset=%s size=%d bytes", file.filename, reset, len(raw))
+    logger.info(
+        "Ingest request | file=%s reset=%s size=%d bytes",
+        file.filename,
+        reset,
+        len(raw),
+    )
 
     try:
-        from src.db.ingest import parse_jsonl, ingest_items
+        from src.db.ingest import ingest_items, parse_jsonl
+
         items = parse_jsonl(raw)
     except Exception as e:
         raise HTTPException(status_code=422, detail=f"Failed to parse JSONL: {e}")
@@ -83,6 +90,7 @@ async def ask_endpoint(req: AskRequest):
 
     try:
         from src.agent.graph import ask_async
+
         result = await ask_async(
             question=req.question,
             country=req.country,
@@ -109,6 +117,7 @@ async def ask_endpoint(req: AskRequest):
 @app.get("/health")
 def health():
     from src.db.vector_store import count_documents
+
     try:
         n = count_documents()
     except Exception:

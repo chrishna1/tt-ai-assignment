@@ -4,12 +4,11 @@ Unit tests covering the three most important functions:
   2. Citation excerpt verification (excerpt is substring of source body)
   3. Score ranking (chunks sorted descending by match_score)
 """
-import pytest
-
 
 # ---------------------------------------------------------------------------
 # Test 1: Metadata filter correctness
 # ---------------------------------------------------------------------------
+
 
 class TestMetadataFilter:
     """
@@ -27,6 +26,7 @@ class TestMetadataFilter:
         )
 
         from src.db.vector_store import retrieve_chunks
+
         retrieve_chunks(query="test question", country="B", language="es", top_k=3)
 
         call_kwargs = mock_store.similarity_search_with_relevance_scores.call_args
@@ -47,6 +47,7 @@ class TestMetadataFilter:
         )
 
         from src.db.vector_store import retrieve_chunks
+
         retrieve_chunks(query="test", country="A", language="en", top_k=3)
 
         call_kwargs = mock_store.similarity_search_with_relevance_scores.call_args
@@ -62,6 +63,7 @@ class TestMetadataFilter:
 # Test 2: Citation excerpt verification
 # ---------------------------------------------------------------------------
 
+
 class TestCitationExcerpt:
     """
     The excerpt in every citation must be a substring of the source body.
@@ -70,6 +72,7 @@ class TestCitationExcerpt:
 
     def _run_extract_citations(self, chunks: list[dict]) -> list[dict]:
         import time
+
         from src.agent.nodes import extract_citations
         from src.agent.state import AgentState
 
@@ -139,6 +142,7 @@ class TestCitationExcerpt:
 # Test 3: Score ranking
 # ---------------------------------------------------------------------------
 
+
 class TestScoreRanking:
     """Retrieved chunks must be sorted descending by match_score."""
 
@@ -147,18 +151,48 @@ class TestScoreRanking:
         from langchain_core.documents import Document
 
         raw_results = [
-            (Document(page_content="low score doc", metadata={
-                "content_id": "low", "type": "FAQ", "country": "A",
-                "language": "en", "title": "T", "version": "1",
-            }), 0.55),
-            (Document(page_content="high score doc", metadata={
-                "content_id": "high", "type": "FAQ", "country": "A",
-                "language": "en", "title": "T", "version": "1",
-            }), 0.95),
-            (Document(page_content="mid score doc", metadata={
-                "content_id": "mid", "type": "FAQ", "country": "A",
-                "language": "en", "title": "T", "version": "1",
-            }), 0.73),
+            (
+                Document(
+                    page_content="low score doc",
+                    metadata={
+                        "content_id": "low",
+                        "type": "FAQ",
+                        "country": "A",
+                        "language": "en",
+                        "title": "T",
+                        "version": "1",
+                    },
+                ),
+                0.55,
+            ),
+            (
+                Document(
+                    page_content="high score doc",
+                    metadata={
+                        "content_id": "high",
+                        "type": "FAQ",
+                        "country": "A",
+                        "language": "en",
+                        "title": "T",
+                        "version": "1",
+                    },
+                ),
+                0.95,
+            ),
+            (
+                Document(
+                    page_content="mid score doc",
+                    metadata={
+                        "content_id": "mid",
+                        "type": "FAQ",
+                        "country": "A",
+                        "language": "en",
+                        "title": "T",
+                        "version": "1",
+                    },
+                ),
+                0.73,
+            ),
         ]
 
         mock_store = mocker.MagicMock()
@@ -169,6 +203,7 @@ class TestScoreRanking:
         )
 
         from src.db.vector_store import retrieve_chunks
+
         chunks = retrieve_chunks("test", "A", "en", top_k=3)
 
         scores = [c["match_score"] for c in chunks]

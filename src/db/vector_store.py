@@ -9,13 +9,14 @@ Client singleton: ChromaDB 1.5+ raises ValueError if two PersistentClient instan
 are created for the same path with different settings. We solve this by keeping a
 single module-level client and passing it to Chroma(client=...) everywhere.
 """
+
 import os
 from typing import Optional
 
 import chromadb
+from dotenv import load_dotenv
 from langchain_chroma import Chroma
 from langchain_openai import OpenAIEmbeddings
-from dotenv import load_dotenv
 
 from src.agent.configuration import Configuration
 
@@ -68,6 +69,7 @@ def get_vector_store(config: Optional[Configuration] = None) -> Chroma:
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
+
 
 def retrieve_chunks(
     query: str,

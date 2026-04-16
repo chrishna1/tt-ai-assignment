@@ -24,19 +24,20 @@ Graph structure:
              └────────────────▼──────────────────┘
                             END
 """
+
 import time
 
-from langgraph.graph import StateGraph, END
+from langgraph.graph import END, StateGraph
 
-from src.agent.models import AgentState, InputState
+from src.agent.models import AgentState
 from src.agent.nodes import (
-    validate_request,
-    generate_query,
-    retrieve,
-    synthesize,
     extract_citations,
+    generate_query,
     handle_fallback,
+    retrieve,
     route_after_validation,
+    synthesize,
+    validate_request,
 )
 
 

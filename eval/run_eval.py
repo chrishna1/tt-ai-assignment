@@ -11,18 +11,20 @@ Each test case specifies:
   - expected_keywords:     all of these must appear in the answer (case-insensitive AND logic)
   - expect_empty:          if True, expect zero citations (isolation / fallback test)
 """
+
 import argparse
 import json
-import sys
 import os
+import sys
 
 # Ensure project root is on the path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from dotenv import load_dotenv
+
 load_dotenv()
 
-from src.agent.graph import ask
+from src.agent.graph import ask  # noqa: E402
 
 TEST_CASES = [
     # 1 — Country A, English: account closure
@@ -171,7 +173,9 @@ def run_single(tc: dict, verbose: bool = False) -> tuple[bool, str]:
 
     # Check all expected keywords appear in answer
     answer_lower = answer.lower()
-    missing_kw = [kw for kw in tc["expected_keywords"] if kw.lower() not in answer_lower]
+    missing_kw = [
+        kw for kw in tc["expected_keywords"] if kw.lower() not in answer_lower
+    ]
     if missing_kw:
         return False, f"Missing keywords in answer: {missing_kw}"
 

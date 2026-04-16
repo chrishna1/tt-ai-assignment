@@ -1,6 +1,7 @@
 """
 Pydantic schemas for the HTTP API (request/response shapes).
 """
+
 from pydantic import BaseModel, Field
 
 

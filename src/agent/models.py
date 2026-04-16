@@ -5,7 +5,9 @@ Citation and Trace are the core value objects produced by the agent.
 InputState is the public API boundary (caller-facing fields).
 AgentState is the full LangGraph state passed between nodes.
 """
+
 from typing import Optional
+
 from typing_extensions import TypedDict
 
 
@@ -24,6 +26,7 @@ class Trace(TypedDict):
 
 class InputState(TypedDict):
     """Public API boundary — the fields callers must supply."""
+
     question: str
     country: str
     language: str

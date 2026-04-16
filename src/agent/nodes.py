@@ -7,19 +7,19 @@ Nodes (in execution order):
   3. synthesize         — LLM call grounded in retrieved chunks
   4. extract_citations  — pull exact excerpts from source docs
 """
-import os
+
 import time
 from typing import Literal, Optional
 
 from dotenv import load_dotenv
 from langchain_anthropic import ChatAnthropic
-from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_openai import ChatOpenAI
 
 from src.agent.configuration import Configuration
 from src.agent.models import AgentState, Citation
-from src.agent.prompts import SYSTEM_PROMPT, QUERY_REWRITE_PROMPT
-from src.db.vector_store import retrieve_chunks, has_content_for
+from src.agent.prompts import QUERY_REWRITE_PROMPT, SYSTEM_PROMPT
+from src.db.vector_store import has_content_for, retrieve_chunks
 
 load_dotenv()
 
@@ -48,6 +48,7 @@ def _get_llm(model: Optional[str] = None):
 # ---------------------------------------------------------------------------
 # Node 1: validate_request
 # ---------------------------------------------------------------------------
+
 
 def validate_request(state: AgentState) -> AgentState:
     """
@@ -96,6 +97,7 @@ def validate_request(state: AgentState) -> AgentState:
 # Node 2: generate_query
 # ---------------------------------------------------------------------------
 
+
 def generate_query(state: AgentState) -> AgentState:
     """Rewrites the user question into a better vector search query."""
     config = Configuration()
@@ -112,6 +114,7 @@ def generate_query(state: AgentState) -> AgentState:
 # ---------------------------------------------------------------------------
 # Node 3: retrieve
 # ---------------------------------------------------------------------------
+
 
 def retrieve(state: AgentState) -> AgentState:
     """Metadata-filtered similarity search. Filter is applied INSIDE the ANN query."""
@@ -130,6 +133,7 @@ def retrieve(state: AgentState) -> AgentState:
 # ---------------------------------------------------------------------------
 # Node 3: synthesize
 # ---------------------------------------------------------------------------
+
 
 def synthesize(state: AgentState) -> AgentState:
     """Generate a grounded answer using only retrieved chunks as context."""
@@ -177,6 +181,7 @@ def synthesize(state: AgentState) -> AgentState:
 # Node 4: extract_citations
 # ---------------------------------------------------------------------------
 
+
 def extract_citations(state: AgentState) -> AgentState:
     """
     Build citations from retrieved chunks.
@@ -221,12 +226,15 @@ def extract_citations(state: AgentState) -> AgentState:
 # Node: handle_fallback
 # ---------------------------------------------------------------------------
 
+
 def handle_fallback(state: AgentState) -> AgentState:
     """Return a structured empty response for unsupported scopes."""
     elapsed_ms = int((time.time() - state.get("start_time", time.time())) * 1000)
 
     config = Configuration()
-    state["answer"] = state.get("fallback_reason", "No content available for your request.")
+    state["answer"] = state.get(
+        "fallback_reason", "No content available for your request."
+    )
     state["language_used"] = state["language"]
     state["citations"] = []
     state["retrieved_chunks"] = []
@@ -242,7 +250,10 @@ def handle_fallback(state: AgentState) -> AgentState:
 # Routing function
 # ---------------------------------------------------------------------------
 
-def route_after_validation(state: AgentState) -> Literal["generate_query", "handle_fallback"]:
+
+def route_after_validation(
+    state: AgentState,
+) -> Literal["generate_query", "handle_fallback"]:
     if state.get("fallback_triggered"):
         return "handle_fallback"
     return "generate_query"
