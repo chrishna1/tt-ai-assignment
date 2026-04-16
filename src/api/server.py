@@ -73,7 +73,7 @@ async def ingest_endpoint(
 
 
 @app.post("/ask", response_model=AskResponse)
-def ask_endpoint(req: AskRequest):
+async def ask_endpoint(req: AskRequest):
     logger.info(
         "Received question | country=%s lang=%s question=%r",
         req.country,
@@ -82,8 +82,8 @@ def ask_endpoint(req: AskRequest):
     )
 
     try:
-        from src.agent.graph import ask
-        result = ask(
+        from src.agent.graph import ask_async
+        result = await ask_async(
             question=req.question,
             country=req.country,
             language=req.language,

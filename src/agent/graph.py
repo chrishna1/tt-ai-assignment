@@ -98,3 +98,23 @@ def ask(question: str, country: str, language: str) -> dict:
 
     result = graph.invoke(initial_state)
     return result
+
+
+async def ask_async(question: str, country: str, language: str) -> dict:
+    """Async version — use this from async contexts (FastAPI)."""
+    initial_state: AgentState = {
+        "question": question,
+        "country": country,
+        "language": language,
+        "search_query": "",
+        "retrieved_chunks": [],
+        "fallback_triggered": False,
+        "fallback_reason": None,
+        "answer": "",
+        "language_used": language,
+        "citations": [],
+        "trace": {"retrieval_count": 0, "latency_ms": 0, "model": ""},
+        "start_time": time.time(),
+    }
+    result = await graph.ainvoke(initial_state)
+    return result
