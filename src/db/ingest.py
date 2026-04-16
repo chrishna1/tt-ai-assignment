@@ -11,7 +11,7 @@ from langchain_core.documents import Document
 from src.db.vector_store import get_embeddings, _get_client, COLLECTION_NAME
 
 
-def parse_jsonl(raw: "str | bytes") -> list[dict]:
+def parse_jsonl(raw: str | bytes) -> list[dict]:
     """Parse JSONL text (str or bytes) into a list of dicts."""
     if isinstance(raw, bytes):
         raw = raw.decode("utf-8")
