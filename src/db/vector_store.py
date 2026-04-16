@@ -17,6 +17,8 @@ from langchain_chroma import Chroma
 from langchain_openai import OpenAIEmbeddings
 from dotenv import load_dotenv
 
+from src.agent.configuration import Configuration
+
 load_dotenv()
 
 COLLECTION_NAME = "content_corpus"
@@ -29,23 +31,29 @@ EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
 _chroma_client: Optional[chromadb.PersistentClient] = None
 
 
-def _get_client() -> chromadb.PersistentClient:
+def _get_client(persist_dir: Optional[str] = None) -> chromadb.PersistentClient:
     global _chroma_client
     if _chroma_client is None:
-        _chroma_client = chromadb.PersistentClient(path=CHROMA_PERSIST_DIR)
+        path = persist_dir or CHROMA_PERSIST_DIR
+        _chroma_client = chromadb.PersistentClient(path=path)
     return _chroma_client
 
 
+def _make_embeddings(model: Optional[str] = None) -> OpenAIEmbeddings:
+    return OpenAIEmbeddings(model=model or EMBEDDING_MODEL)
+
+
 def get_embeddings() -> OpenAIEmbeddings:
-    return OpenAIEmbeddings(model=EMBEDDING_MODEL)
+    return _make_embeddings()
 
 
-def get_vector_store() -> Chroma:
+def get_vector_store(config: Optional[Configuration] = None) -> Chroma:
     """Return a Chroma vector store using the shared client."""
+    cfg = config or Configuration()
     return Chroma(
-        client=_get_client(),
+        client=_get_client(cfg.chroma_persist_dir),
         collection_name=COLLECTION_NAME,
-        embedding_function=get_embeddings(),
+        embedding_function=_make_embeddings(cfg.embedding_model),
     )
 
 
@@ -56,6 +64,7 @@ def retrieve_chunks(
     country: str,
     language: str,
     top_k: int = 5,
+    config: Optional[Configuration] = None,
 ) -> list[dict]:
     """
     Retrieve top-K chunks filtered by country AND language BEFORE similarity ranking.
@@ -64,7 +73,7 @@ def retrieve_chunks(
     inside the ANN search, not after fetching top-K globally. This prevents
     cross-country content from ever entering the result set.
     """
-    store = get_vector_store()
+    store = get_vector_store(config)
 
     where_filter = {
         "$and": [

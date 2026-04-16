@@ -9,21 +9,24 @@ Nodes (in execution order):
 """
 import os
 import time
-from typing import Literal
+from typing import Literal, Optional
 
 from dotenv import load_dotenv
 from langchain_anthropic import ChatAnthropic
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
 
+from src.agent.configuration import Configuration
 from src.agent.models import AgentState, Citation
 from src.agent.prompts import SYSTEM_PROMPT
 from src.db.vector_store import retrieve_chunks, has_content_for
 
 load_dotenv()
 
-LLM_MODEL = os.getenv("LLM_MODEL", "claude-haiku-4-5-20251001")
-RETRIEVAL_TOP_K = int(os.getenv("RETRIEVAL_TOP_K", "5"))
+# Module-level defaults (kept for backward compatibility)
+_default_config = Configuration()
+LLM_MODEL = _default_config.llm_model
+RETRIEVAL_TOP_K = _default_config.retrieval_top_k
 
 # Supported country/language combos per the corpus
 VALID_SCOPES: dict[str, list[str]] = {
@@ -34,11 +37,12 @@ VALID_SCOPES: dict[str, list[str]] = {
 }
 
 
-def _get_llm():
-    if "claude" in LLM_MODEL.lower():
-        return ChatAnthropic(model=LLM_MODEL, temperature=0)
+def _get_llm(model: Optional[str] = None):
+    llm_model = model or LLM_MODEL
+    if "claude" in llm_model.lower():
+        return ChatAnthropic(model=llm_model, temperature=0)
     else:
-        return ChatOpenAI(model=LLM_MODEL, temperature=0)
+        return ChatOpenAI(model=llm_model, temperature=0)
 
 
 # ---------------------------------------------------------------------------
@@ -94,11 +98,13 @@ def validate_request(state: AgentState) -> AgentState:
 
 def retrieve(state: AgentState) -> AgentState:
     """Metadata-filtered similarity search. Filter is applied INSIDE the ANN query."""
+    config = Configuration()
     chunks = retrieve_chunks(
-        query=state["question"],
+        query=state.get("search_query") or state["question"],
         country=state["country"],
         language=state["language"],
-        top_k=RETRIEVAL_TOP_K,
+        top_k=config.retrieval_top_k,
+        config=config,
     )
     state["retrieved_chunks"] = chunks
     return state
@@ -137,7 +143,8 @@ def synthesize(state: AgentState) -> AgentState:
         f"Answer in language: {state['language']}"
     )
 
-    llm = _get_llm()
+    config = Configuration()
+    llm = _get_llm(config.llm_model)
     messages = [
         SystemMessage(content=SYSTEM_PROMPT),
         HumanMessage(content=user_message),
@@ -183,11 +190,12 @@ def extract_citations(state: AgentState) -> AgentState:
             )
         )
 
+    config = Configuration()
     state["citations"] = citations
     state["trace"] = {
         "retrieval_count": len(state["retrieved_chunks"]),
         "latency_ms": elapsed_ms,
-        "model": LLM_MODEL,
+        "model": config.llm_model,
     }
     return state
 
@@ -200,6 +208,7 @@ def handle_fallback(state: AgentState) -> AgentState:
     """Return a structured empty response for unsupported scopes."""
     elapsed_ms = int((time.time() - state.get("start_time", time.time())) * 1000)
 
+    config = Configuration()
     state["answer"] = state.get("fallback_reason", "No content available for your request.")
     state["language_used"] = state["language"]
     state["citations"] = []
@@ -207,7 +216,7 @@ def handle_fallback(state: AgentState) -> AgentState:
     state["trace"] = {
         "retrieval_count": 0,
         "latency_ms": elapsed_ms,
-        "model": LLM_MODEL,
+        "model": config.llm_model,
     }
     return state
 
