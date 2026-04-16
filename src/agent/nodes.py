@@ -140,11 +140,7 @@ async def synthesize(
         )
     context = "\n\n---\n\n".join(context_parts)
 
-    user_message = (
-        f"Content excerpts:\n\n{context}\n\n"
-        f"Question: {state['question']}\n\n"
-        f"Answer in language: {state['language']}"
-    )
+    user_message = f"Content excerpts:\n\n{context}\n\n Question: {state['question']}"
 
     cfg = Configuration.from_runnable_config(config)
     llm = _get_llm(cfg.llm_model)

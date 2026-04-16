@@ -39,6 +39,12 @@ class Configuration:
         default_factory=lambda: int(os.getenv("RETRIEVAL_TOP_K", "5")),
         metadata={"description": "Number of chunks to retrieve per query."},
     )
+    min_relevance_score: float = field(
+        default_factory=lambda: float(os.getenv("MIN_RELEVANCE_SCORE", "0.0")),
+        metadata={
+            "description": "Minimum similarity score to keep a chunk. Chunks below this are discarded."
+        },
+    )
     chroma_persist_dir: str = field(
         default_factory=lambda: os.getenv("CHROMA_PERSIST_DIR", "./chroma_db"),
         metadata={"description": "Directory for ChromaDB persistent storage."},

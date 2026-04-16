@@ -140,16 +140,17 @@ def retrieve_chunks(
         )
 
     chunks.sort(key=lambda x: x["match_score"], reverse=True)
+
+    min_score = configuration.min_relevance_score
+    chunks = [c for c in chunks if c["match_score"] >= min_score]
+
     return chunks
 
 
 def count_documents() -> int:
     """Return total document count in the collection."""
-    try:
-        collection = _get_client().get_collection(COLLECTION_NAME)
-        return collection.count()
-    except Exception:
-        return 0
+    collection = _get_client().get_collection(COLLECTION_NAME)
+    return collection.count()
 
 
 def has_content_for(country: str, language: str) -> bool:
