@@ -82,8 +82,33 @@ bash start.sh --reset
 ```
 
 This will:
-1. Ingest `corpus.jsonl` (44 items) into ChromaDB
-2. Start the FastAPI server on `http://localhost:8000`
+1. Start the FastAPI server on `http://localhost:8000`
+2. POST `corpus.jsonl` to the `/ingest` endpoint to embed it into ChromaDB
+
+### Ingest manually via the API
+
+```bash
+# Default corpus
+curl -X POST http://localhost:8000/ingest \
+  -F "file=@corpus.jsonl" \
+  -F "reset=false"
+
+# Re-ingest a different file and wipe existing data
+curl -X POST http://localhost:8000/ingest \
+  -F "file=@my_corpus.jsonl" \
+  -F "reset=true"
+```
+
+Response:
+```json
+{ "status": "ok", "ingested": 44, "breakdown": { "A/en": 7, "A/hi": 5, ... } }
+```
+
+### Or ingest via CLI (no server needed)
+
+```bash
+python ingest.py --corpus corpus.jsonl --reset
+```
 
 ---
 

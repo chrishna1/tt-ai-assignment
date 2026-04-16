@@ -21,6 +21,7 @@ anthropic==0.95.0
 # Utilities
 python-dotenv==1.2.1
 httpx==0.28.1
+python-multipart==0.0.20
 
 # Testing
 pytest==8.4.2

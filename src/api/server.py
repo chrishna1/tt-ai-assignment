@@ -1,6 +1,10 @@
 """
 FastAPI HTTP wrapper around the LangGraph Q&A agent.
 
+POST /ingest
+    Upload a corpus.jsonl file to embed and store in ChromaDB.
+    Form params: file (UploadFile), reset (bool, default False)
+
 POST /ask
     Request:  { "question": str, "country": str, "language": str }
     Response: { "answer": str, "language_used": str, "citations": [...], "trace": {...} }
@@ -12,7 +16,7 @@ import logging
 import os
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel, Field
 
 load_dotenv()
@@ -54,6 +58,44 @@ class AskResponse(BaseModel):
     language_used: str
     citations: list[CitationResponse]
     trace: TraceResponse
+
+
+@app.post("/ingest")
+async def ingest_endpoint(
+    file: UploadFile = File(..., description="corpus.jsonl file to ingest"),
+    reset: bool = Form(False, description="Wipe existing collection before ingesting"),
+):
+    """
+    Upload a .jsonl corpus file and embed it into ChromaDB.
+    Each line must be a JSON object with fields: content_id, country, language,
+    type, version, title, body, updated_at.
+    """
+    if not file.filename or not file.filename.endswith(".jsonl"):
+        raise HTTPException(status_code=400, detail="File must be a .jsonl file")
+
+    raw = await file.read()
+    if not raw.strip():
+        raise HTTPException(status_code=400, detail="Uploaded file is empty")
+
+    logger.info("Ingest request | file=%s reset=%s size=%d bytes", file.filename, reset, len(raw))
+
+    try:
+        from src.db.ingest import parse_jsonl, ingest_items
+        items = parse_jsonl(raw)
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Failed to parse JSONL: {e}")
+
+    if not items:
+        raise HTTPException(status_code=422, detail="No valid JSON lines found in file")
+
+    try:
+        summary = ingest_items(items, reset=reset)
+    except Exception as e:
+        logger.exception("Ingest error")
+        raise HTTPException(status_code=500, detail=str(e))
+
+    logger.info("Ingest complete | ingested=%d", summary["ingested"])
+    return {"status": "ok", **summary}
 
 
 @app.post("/ask", response_model=AskResponse)
