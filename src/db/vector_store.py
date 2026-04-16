@@ -30,6 +30,9 @@ from langchain_openai import OpenAIEmbeddings
 from src.agent.configuration import Configuration
 
 COLLECTION_NAME = "content_corpus"
+# Cosine distance gives relevance = cosine_similarity ∈ [-1, 1].
+# L2 (the ChromaDB default) produces negative relevance for typical short docs.
+COLLECTION_METADATA = {"hnsw:space": "cosine"}
 CHROMA_PERSIST_DIR = os.getenv("CHROMA_PERSIST_DIR", "./chroma_db")
 
 # ── ChromaDB singleton ────────────────────────────────────────────────────────
@@ -60,6 +63,7 @@ def _make_chroma_retriever(
         client=_get_client(configuration.chroma_persist_dir),
         collection_name=COLLECTION_NAME,
         embedding_function=_make_embeddings(configuration.embedding_model),
+        collection_metadata=COLLECTION_METADATA,
     )
     yield vstore.as_retriever(search_kwargs={"k": configuration.retrieval_top_k})
 
@@ -109,6 +113,7 @@ def retrieve_chunks(
         client=_get_client(configuration.chroma_persist_dir),
         collection_name=COLLECTION_NAME,
         embedding_function=_make_embeddings(configuration.embedding_model),
+        collection_metadata=COLLECTION_METADATA,
     )
 
     where_filter = {

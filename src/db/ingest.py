@@ -8,7 +8,12 @@ from collections import Counter
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
 
-from src.db.vector_store import COLLECTION_NAME, _get_client, get_embeddings
+from src.db.vector_store import (
+    COLLECTION_METADATA,
+    COLLECTION_NAME,
+    _get_client,
+    _make_embeddings,
+)
 
 
 def parse_jsonl(raw: str | bytes) -> list[dict]:
@@ -65,7 +70,8 @@ def ingest_items(items: list[dict], reset: bool = False) -> dict:
     store = Chroma(
         client=_get_client(),
         collection_name=COLLECTION_NAME,
-        embedding_function=get_embeddings(),
+        embedding_function=_make_embeddings("text-embedding-3-small"),
+        collection_metadata=COLLECTION_METADATA,
     )
     store.add_documents(documents=docs, ids=ids)
 
