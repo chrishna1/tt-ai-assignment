@@ -30,5 +30,3 @@ if __name__ == "__main__":
     print(f"[ingest] Loading {args.corpus} ...")
     summary = ingest_file(args.corpus, reset=args.reset)
     print(f"[ingest] Done. {summary['ingested']} documents stored.")
-    for scope, count in summary["breakdown"].items():
-        print(f"         {scope}: {count}")
