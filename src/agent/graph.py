@@ -65,11 +65,9 @@ def build_graph() -> StateGraph:
 
     builder.set_entry_point("validate_request")
 
-    # validate_request and retrieve use Command for dynamic routing to handle_fallback;
-    # the happy-path edges below cover the non-Command (ok) case.
-    builder.add_edge("validate_request", "generate_query")
+    # validate_request and retrieve always return Command (no static edges from them).
+    # Mixing static edges with Command causes both to be followed — avoid it.
     builder.add_edge("generate_query", "retrieve")
-    builder.add_edge("retrieve", "synthesize")
     builder.add_edge("synthesize", "extract_citations")
     builder.add_edge("extract_citations", END)
     builder.add_edge("handle_fallback", END)

@@ -56,25 +56,28 @@ def _fallback_command(reason: str) -> Command:
 
 async def validate_request(
     state: AgentState, *, config: Optional[RunnableConfig] = None
-) -> Command | AgentState:
+) -> Command:
     """
     Check whether the requested country/language scope has content in the DB.
 
     Scope is derived dynamically from has_content_for() so no code change is
     needed when a new country/language is added to the corpus.
+
+    Always returns Command so there are no static edges from this node — mixing
+    static edges with Command causes both to be followed in LangGraph.
     """
     country = state["country"].upper()
     language = state["language"]
-
-    state["country"] = country
-    state["start_time"] = time.time()
 
     if not has_content_for(country, language):
         return _fallback_command(
             f"No content found in the database for country='{country}', language='{language}'."
         )
 
-    return state
+    return Command(
+        goto="generate_query",
+        update={"country": country, "start_time": time.time()},
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -104,10 +107,13 @@ async def generate_query(
 
 async def retrieve(
     state: AgentState, *, config: Optional[RunnableConfig] = None
-) -> Command | AgentState:
+) -> Command:
     """
     Metadata-filtered similarity search. Filter is applied INSIDE the ANN query.
     Routes to handle_fallback if no chunks pass the relevance threshold.
+
+    Always returns Command so there are no static edges from this node — mixing
+    static edges with Command causes both to be followed in LangGraph.
     """
     cfg = Configuration.from_runnable_config(config)
     chunks = retrieve_chunks(
@@ -123,8 +129,7 @@ async def retrieve(
             "No relevant content found for your question in the available documents."
         )
 
-    state["retrieved_chunks"] = chunks
-    return state
+    return Command(goto="synthesize", update={"retrieved_chunks": chunks})
 
 
 # ---------------------------------------------------------------------------
