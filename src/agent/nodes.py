@@ -17,6 +17,7 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from src.agent.models import AgentState, Citation
+from src.agent.prompts import SYSTEM_PROMPT
 from src.db.vector_store import retrieve_chunks, has_content_for
 
 load_dotenv()
@@ -106,19 +107,6 @@ def retrieve(state: AgentState) -> AgentState:
 # ---------------------------------------------------------------------------
 # Node 3: synthesize
 # ---------------------------------------------------------------------------
-
-SYSTEM_PROMPT = """You are a helpful customer support assistant for a B2B retail platform.
-
-Answer the user's question using ONLY the information in the provided content excerpts.
-Do not use your general world knowledge to fill in gaps — if the answer is not in the excerpts,
-say you don't have that information in the available content.
-
-Rules:
-- Be concise and direct.
-- Answer in the same language as the question.
-- Only reference facts that appear in the provided excerpts.
-- Do not make up information or extrapolate beyond what is explicitly stated.
-"""
 
 def synthesize(state: AgentState) -> AgentState:
     """Generate a grounded answer using only retrieved chunks as context."""
