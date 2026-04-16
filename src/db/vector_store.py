@@ -47,14 +47,24 @@ def get_embeddings() -> OpenAIEmbeddings:
     return _make_embeddings()
 
 
+def make_retriever(config: Configuration) -> Chroma:
+    """Factory — returns the configured vector store retriever.
+
+    Currently only ChromaDB is supported. To add another backend,
+    add an elif branch here checking a config field (e.g. config.backend).
+    """
+    # currently only chroma supported
+    return Chroma(
+        client=_get_client(config.chroma_persist_dir),
+        collection_name=COLLECTION_NAME,
+        embedding_function=_make_embeddings(config.embedding_model),
+    )
+
+
 def get_vector_store(config: Optional[Configuration] = None) -> Chroma:
     """Return a Chroma vector store using the shared client."""
     cfg = config or Configuration()
-    return Chroma(
-        client=_get_client(cfg.chroma_persist_dir),
-        collection_name=COLLECTION_NAME,
-        embedding_function=_make_embeddings(cfg.embedding_model),
-    )
+    return make_retriever(cfg)
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
