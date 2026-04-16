@@ -8,6 +8,7 @@ from collections import Counter
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
 
+from src.agent.configuration import Configuration
 from src.db.vector_store import (
     COLLECTION_METADATA,
     COLLECTION_NAME,
@@ -67,10 +68,11 @@ def ingest_items(items: list[dict], reset: bool = False) -> dict:
     docs = build_documents(items)
     ids = [doc.metadata["content_id"] for doc in docs]
 
+    cfg = Configuration()
     store = Chroma(
         client=_get_client(),
         collection_name=COLLECTION_NAME,
-        embedding_function=_make_embeddings("text-embedding-3-small"),
+        embedding_function=_make_embeddings(cfg.embedding_model),
         collection_metadata=COLLECTION_METADATA,
     )
     store.add_documents(documents=docs, ids=ids)

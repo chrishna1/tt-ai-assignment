@@ -156,23 +156,3 @@ def count_documents() -> int:
     """Return total document count in the collection."""
     collection = _get_client().get_collection(COLLECTION_NAME)
     return collection.count()
-
-
-def has_content_for(country: str, language: str) -> bool:
-    """Check whether any content exists for the given country+language scope."""
-    try:
-        collection = _get_client().get_collection(COLLECTION_NAME)
-    except Exception:
-        return False
-
-    results = collection.get(
-        where={
-            "$and": [
-                {"country": {"$eq": country}},
-                {"language": {"$eq": language}},
-            ]
-        },
-        limit=1,
-        include=[],
-    )
-    return len(results["ids"]) > 0

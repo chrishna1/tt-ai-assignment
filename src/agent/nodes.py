@@ -30,7 +30,7 @@ from langgraph.types import Command
 from src.agent.configuration import Configuration
 from src.agent.models import AgentState, Citation
 from src.agent.prompts import QUERY_REWRITE_PROMPT, SYSTEM_PROMPT
-from src.db.vector_store import has_content_for, retrieve_chunks
+from src.db.vector_store import retrieve_chunks
 
 load_dotenv()
 
@@ -58,25 +58,17 @@ async def validate_request(
     state: AgentState, *, config: Optional[RunnableConfig] = None
 ) -> Command:
     """
-    Check whether the requested country/language scope has content in the DB.
+    Normalise input and proceed to query generation.
 
-    Scope is derived dynamically from has_content_for() so no code change is
-    needed when a new country/language is added to the corpus.
+    Existence of content for this country/language is not pre-checked here —
+    that is a redundant DB round-trip. retrieve() handles the empty-result case
+    via Command(goto="handle_fallback") with a single query, not two.
 
-    Always returns Command so there are no static edges from this node — mixing
-    static edges with Command causes both to be followed in LangGraph.
+    Always returns Command so there are no static edges from this node.
     """
-    country = state["country"].upper()
-    language = state["language"]
-
-    if not has_content_for(country, language):
-        return _fallback_command(
-            f"No content found in the database for country='{country}', language='{language}'."
-        )
-
     return Command(
         goto="generate_query",
-        update={"country": country, "start_time": time.time()},
+        update={"start_time": time.time()},
     )
 
 
