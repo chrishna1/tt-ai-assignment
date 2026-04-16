@@ -29,12 +29,7 @@ class InputState(TypedDict):
     language: str
 
 
-class AgentState(TypedDict):
-    # Inputs (same as InputState — duplicated for Python 3.9 compatibility)
-    question: str
-    country: str
-    language: str
-
+class AgentState(InputState):
     # Intermediate
     search_query: str
     retrieved_chunks: list
