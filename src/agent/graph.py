@@ -31,6 +31,7 @@ from langgraph.graph import StateGraph, END
 from src.agent.models import AgentState, InputState
 from src.agent.nodes import (
     validate_request,
+    generate_query,
     retrieve,
     synthesize,
     extract_citations,
@@ -43,6 +44,7 @@ def build_graph() -> StateGraph:
     builder = StateGraph(AgentState)
 
     builder.add_node("validate_request", validate_request)
+    builder.add_node("generate_query", generate_query)
     builder.add_node("retrieve", retrieve)
     builder.add_node("synthesize", synthesize)
     builder.add_node("extract_citations", extract_citations)
@@ -54,11 +56,12 @@ def build_graph() -> StateGraph:
         "validate_request",
         route_after_validation,
         {
-            "retrieve": "retrieve",
+            "generate_query": "generate_query",
             "handle_fallback": "handle_fallback",
         },
     )
 
+    builder.add_edge("generate_query", "retrieve")
     builder.add_edge("retrieve", "synthesize")
     builder.add_edge("synthesize", "extract_citations")
     builder.add_edge("extract_citations", END)

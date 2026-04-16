@@ -18,7 +18,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from src.agent.configuration import Configuration
 from src.agent.models import AgentState, Citation
-from src.agent.prompts import SYSTEM_PROMPT
+from src.agent.prompts import SYSTEM_PROMPT, QUERY_REWRITE_PROMPT
 from src.db.vector_store import retrieve_chunks, has_content_for
 
 load_dotenv()
@@ -93,7 +93,24 @@ def validate_request(state: AgentState) -> AgentState:
 
 
 # ---------------------------------------------------------------------------
-# Node 2: retrieve
+# Node 2: generate_query
+# ---------------------------------------------------------------------------
+
+def generate_query(state: AgentState) -> AgentState:
+    """Rewrites the user question into a better vector search query."""
+    config = Configuration()
+    llm = _get_llm(config.llm_model)
+    messages = [
+        SystemMessage(content=QUERY_REWRITE_PROMPT),
+        HumanMessage(content=state["question"]),
+    ]
+    response = llm.invoke(messages)
+    state["search_query"] = response.content.strip()
+    return state
+
+
+# ---------------------------------------------------------------------------
+# Node 3: retrieve
 # ---------------------------------------------------------------------------
 
 def retrieve(state: AgentState) -> AgentState:
@@ -225,7 +242,7 @@ def handle_fallback(state: AgentState) -> AgentState:
 # Routing function
 # ---------------------------------------------------------------------------
 
-def route_after_validation(state: AgentState) -> Literal["retrieve", "handle_fallback"]:
+def route_after_validation(state: AgentState) -> Literal["generate_query", "handle_fallback"]:
     if state.get("fallback_triggered"):
         return "handle_fallback"
-    return "retrieve"
+    return "generate_query"
