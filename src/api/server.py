@@ -33,7 +33,6 @@ app = FastAPI(
     version="1.0.0",
 )
 
-
 class AskRequest(BaseModel):
     question: str = Field(..., min_length=1, max_length=1000)
     country: str = Field(..., min_length=1, max_length=10)

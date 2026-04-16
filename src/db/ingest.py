@@ -5,12 +5,10 @@ import json
 import os
 from collections import Counter
 
-import chromadb
-from chromadb.config import Settings
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
 
-from src.db.vector_store import get_embeddings, COLLECTION_NAME, CHROMA_PERSIST_DIR
+from src.db.vector_store import get_embeddings, _get_client, COLLECTION_NAME
 
 
 def parse_jsonl(raw: str | bytes) -> list[dict]:
@@ -56,12 +54,8 @@ def ingest_items(items: list[dict], reset: bool = False) -> dict:
         Summary dict: { "ingested": int, "breakdown": {country/language: count} }
     """
     if reset:
-        client = chromadb.PersistentClient(
-            path=CHROMA_PERSIST_DIR,
-            settings=Settings(anonymized_telemetry=False),
-        )
         try:
-            client.delete_collection(COLLECTION_NAME)
+            _get_client().delete_collection(COLLECTION_NAME)
         except Exception:
             pass
 
@@ -69,9 +63,9 @@ def ingest_items(items: list[dict], reset: bool = False) -> dict:
     ids = [doc.metadata["content_id"] for doc in docs]
 
     store = Chroma(
+        client=_get_client(),
         collection_name=COLLECTION_NAME,
         embedding_function=get_embeddings(),
-        persist_directory=CHROMA_PERSIST_DIR,
     )
     store.add_documents(documents=docs, ids=ids)
 
