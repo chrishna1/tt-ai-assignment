@@ -25,8 +25,6 @@ Graph structure:
                             END
 """
 
-import time
-
 from langgraph.graph import END, StateGraph
 
 from src.agent.models import AgentState
@@ -75,34 +73,10 @@ def build_graph() -> StateGraph:
 graph = build_graph()
 
 
-def ask(question: str, country: str, language: str) -> dict:
-    """
-    Run the agent for a single question.
-
-    InputState is the public interface — callers supply question, country, language.
-    Returns the final AgentState as a plain dict.
-    """
-    initial_state: AgentState = {
-        "question": question,
-        "country": country,
-        "language": language,
-        "search_query": "",
-        "retrieved_chunks": [],
-        "fallback_triggered": False,
-        "fallback_reason": None,
-        "answer": "",
-        "language_used": language,
-        "citations": [],
-        "trace": {"retrieval_count": 0, "latency_ms": 0, "model": ""},
-        "start_time": time.time(),
-    }
-
-    result = graph.invoke(initial_state)
-    return result
-
-
 async def ask_async(question: str, country: str, language: str) -> dict:
-    """Async version — use this from async contexts (FastAPI)."""
+    """Run the agent for a single question. Returns the final AgentState as a plain dict."""
+    import time
+
     initial_state: AgentState = {
         "question": question,
         "country": country,

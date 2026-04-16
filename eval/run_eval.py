@@ -13,6 +13,7 @@ Each test case specifies:
 """
 
 import argparse
+import asyncio
 import json
 import os
 import sys
@@ -24,7 +25,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from src.agent.graph import ask  # noqa: E402
+from src.agent.graph import ask_async  # noqa: E402
 
 TEST_CASES = [
     # 1 — Country A, English: account closure
@@ -143,10 +144,12 @@ TEST_CASES = [
 def run_single(tc: dict, verbose: bool = False) -> tuple[bool, str]:
     """Run one test case. Returns (passed, reason)."""
     try:
-        result = ask(
-            question=tc["question"],
-            country=tc["country"],
-            language=tc["language"],
+        result = asyncio.run(
+            ask_async(
+                question=tc["question"],
+                country=tc["country"],
+                language=tc["language"],
+            )
         )
     except Exception as e:
         return False, f"Exception: {e}"
@@ -204,7 +207,9 @@ def main():
 
         if args.verbose:
             try:
-                result = ask(tc["question"], tc["country"], tc["language"])
+                result = asyncio.run(
+                    ask_async(tc["question"], tc["country"], tc["language"])
+                )
                 print(f"  Answer : {result['answer'][:200]}")
                 print(f"  Trace  : {result['trace']}")
             except Exception:
