@@ -21,9 +21,9 @@ class TestMetadataFilter:
         mock_store = mocker.MagicMock()
         mock_store.similarity_search_with_relevance_scores.return_value = []
         mocker.patch(
-            "src.db.vector_store.get_vector_store",
-            return_value=mock_store,
+            "src.db.vector_store._make_embeddings", return_value=mocker.MagicMock()
         )
+        mocker.patch("src.db.vector_store.Chroma", return_value=mock_store)
 
         from src.db.vector_store import retrieve_chunks
 
@@ -42,9 +42,9 @@ class TestMetadataFilter:
         mock_store = mocker.MagicMock()
         mock_store.similarity_search_with_relevance_scores.return_value = []
         mocker.patch(
-            "src.db.vector_store.get_vector_store",
-            return_value=mock_store,
+            "src.db.vector_store._make_embeddings", return_value=mocker.MagicMock()
         )
+        mocker.patch("src.db.vector_store.Chroma", return_value=mock_store)
 
         from src.db.vector_store import retrieve_chunks
 
@@ -70,7 +70,7 @@ class TestCitationExcerpt:
     This is the core citation fidelity check.
     """
 
-    def _run_extract_citations(self, chunks: list[dict]) -> list[dict]:
+    async def _run_extract_citations(self, chunks: list[dict]) -> list[dict]:
         import time
 
         from src.agent.nodes import extract_citations
@@ -89,10 +89,10 @@ class TestCitationExcerpt:
             "trace": {"retrieval_count": 0, "latency_ms": 0, "model": ""},
             "start_time": time.time(),
         }
-        result = extract_citations(state)
+        result = await extract_citations(state)
         return result["citations"]
 
-    def test_excerpt_is_substring_of_body(self):
+    async def test_excerpt_is_substring_of_body(self):
         body = (
             "Returns are accepted within 48 hours of delivery for defective "
             "or incorrect items. Perishable goods cannot be returned once accepted."
@@ -109,7 +109,7 @@ class TestCitationExcerpt:
                 "match_score": 0.92,
             }
         ]
-        citations = self._run_extract_citations(chunks)
+        citations = await self._run_extract_citations(chunks)
         assert len(citations) == 1
         excerpt = citations[0]["excerpt"]
         # Strip trailing ellipsis before checking substring
@@ -118,7 +118,7 @@ class TestCitationExcerpt:
             f"Excerpt not found in source body.\nExcerpt: {excerpt!r}\nBody: {body!r}"
         )
 
-    def test_long_body_excerpt_truncated(self):
+    async def test_long_body_excerpt_truncated(self):
         body = "A" * 300  # 300 chars
         chunks = [
             {
@@ -132,7 +132,7 @@ class TestCitationExcerpt:
                 "match_score": 0.8,
             }
         ]
-        citations = self._run_extract_citations(chunks)
+        citations = await self._run_extract_citations(chunks)
         assert len(citations) == 1
         # Excerpt must be at most 200 chars (plus possible "...")
         assert len(citations[0]["excerpt"]) <= 203  # 200 + "..."
@@ -198,9 +198,9 @@ class TestScoreRanking:
         mock_store = mocker.MagicMock()
         mock_store.similarity_search_with_relevance_scores.return_value = raw_results
         mocker.patch(
-            "src.db.vector_store.get_vector_store",
-            return_value=mock_store,
+            "src.db.vector_store._make_embeddings", return_value=mocker.MagicMock()
         )
+        mocker.patch("src.db.vector_store.Chroma", return_value=mock_store)
 
         from src.db.vector_store import retrieve_chunks
 

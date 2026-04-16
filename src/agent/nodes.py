@@ -3,9 +3,13 @@ LangGraph node implementations.
 
 Nodes (in execution order):
   1. validate_request   — check country/language scope exists in the DB
-  2. retrieve           — metadata-filtered similarity search
-  3. synthesize         — LLM call grounded in retrieved chunks
-  4. extract_citations  — pull exact excerpts from source docs
+  2. generate_query     — rewrite question for better vector search
+  3. retrieve           — metadata-filtered similarity search
+  4. synthesize         — LLM call grounded in retrieved chunks
+  5. extract_citations  — pull exact excerpts from source docs
+
+All nodes are async and accept (state, *, config: RunnableConfig) so that
+callers can override Configuration fields per-request via config["configurable"].
 """
 
 import time
@@ -14,6 +18,7 @@ from typing import Literal, Optional
 from dotenv import load_dotenv
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.runnables import RunnableConfig
 from langchain_openai import ChatOpenAI
 
 from src.agent.configuration import Configuration
@@ -23,26 +28,11 @@ from src.db.vector_store import has_content_for, retrieve_chunks
 
 load_dotenv()
 
-# Module-level defaults (kept for backward compatibility)
-_default_config = Configuration()
-LLM_MODEL = _default_config.llm_model
-RETRIEVAL_TOP_K = _default_config.retrieval_top_k
 
-# Supported country/language combos per the corpus
-VALID_SCOPES: dict[str, list[str]] = {
-    "A": ["en", "hi"],
-    "B": ["en", "es"],
-    "C": ["en", "fr_CA"],
-    "D": ["en"],
-}
-
-
-def _get_llm(model: Optional[str] = None):
-    llm_model = model or LLM_MODEL
-    if "claude" in llm_model.lower():
-        return ChatAnthropic(model=llm_model, temperature=0)
-    else:
-        return ChatOpenAI(model=llm_model, temperature=0)
+def _get_llm(model: str):
+    if "claude" in model.lower():
+        return ChatAnthropic(model=model, temperature=0)
+    return ChatOpenAI(model=model, temperature=0)
 
 
 # ---------------------------------------------------------------------------
@@ -50,40 +40,27 @@ def _get_llm(model: Optional[str] = None):
 # ---------------------------------------------------------------------------
 
 
-def validate_request(state: AgentState) -> AgentState:
+async def validate_request(
+    state: AgentState, *, config: Optional[RunnableConfig] = None
+) -> AgentState:
     """
-    Check whether the requested country/language scope has content.
+    Check whether the requested country/language scope has content in the DB.
+
+    Scope is derived dynamically from has_content_for() so no code change is
+    needed when a new country/language is added to the corpus.
 
     Fallback strategy (deliberate choice):
-      - If the country is unknown → error, no fallback.
-      - If the language is not available in the country → return empty result
-        with a clear message. We do NOT fall back to another language because
-        the caller explicitly requested a language; silently changing it would
-        be confusing. This is documented in README.
+      - If the country+language combo has no content → fallback with clear message.
+      - We do NOT silently switch languages — the caller explicitly requested one.
     """
     country = state["country"].upper()
     language = state["language"]
 
-    state["country"] = country  # normalise to uppercase
+    state["country"] = country
     state["fallback_triggered"] = False
     state["fallback_reason"] = None
     state["start_time"] = time.time()
 
-    valid_langs = VALID_SCOPES.get(country)
-    if valid_langs is None:
-        state["fallback_triggered"] = True
-        state["fallback_reason"] = f"Country '{country}' is not a supported scope."
-        return state
-
-    if language not in valid_langs:
-        state["fallback_triggered"] = True
-        state["fallback_reason"] = (
-            f"No content available for country '{country}' in language '{language}'. "
-            f"Available languages for this country: {valid_langs}."
-        )
-        return state
-
-    # Double-check against the live DB (catches edge cases after partial ingestion)
     if not has_content_for(country, language):
         state["fallback_triggered"] = True
         state["fallback_reason"] = (
@@ -98,15 +75,17 @@ def validate_request(state: AgentState) -> AgentState:
 # ---------------------------------------------------------------------------
 
 
-def generate_query(state: AgentState) -> AgentState:
+async def generate_query(
+    state: AgentState, *, config: Optional[RunnableConfig] = None
+) -> AgentState:
     """Rewrites the user question into a better vector search query."""
-    config = Configuration()
-    llm = _get_llm(config.llm_model)
+    cfg = Configuration.from_runnable_config(config)
+    llm = _get_llm(cfg.llm_model)
     messages = [
         SystemMessage(content=QUERY_REWRITE_PROMPT),
         HumanMessage(content=state["question"]),
     ]
-    response = llm.invoke(messages)
+    response = await llm.ainvoke(messages)
     state["search_query"] = response.content.strip()
     return state
 
@@ -116,14 +95,16 @@ def generate_query(state: AgentState) -> AgentState:
 # ---------------------------------------------------------------------------
 
 
-def retrieve(state: AgentState) -> AgentState:
+async def retrieve(
+    state: AgentState, *, config: Optional[RunnableConfig] = None
+) -> AgentState:
     """Metadata-filtered similarity search. Filter is applied INSIDE the ANN query."""
-    config = Configuration()
+    cfg = Configuration.from_runnable_config(config)
     chunks = retrieve_chunks(
         query=state.get("search_query") or state["question"],
         country=state["country"],
         language=state["language"],
-        top_k=config.retrieval_top_k,
+        top_k=cfg.retrieval_top_k,
         config=config,
     )
     state["retrieved_chunks"] = chunks
@@ -131,11 +112,13 @@ def retrieve(state: AgentState) -> AgentState:
 
 
 # ---------------------------------------------------------------------------
-# Node 3: synthesize
+# Node 4: synthesize
 # ---------------------------------------------------------------------------
 
 
-def synthesize(state: AgentState) -> AgentState:
+async def synthesize(
+    state: AgentState, *, config: Optional[RunnableConfig] = None
+) -> AgentState:
     """Generate a grounded answer using only retrieved chunks as context."""
     chunks = state["retrieved_chunks"]
 
@@ -148,7 +131,6 @@ def synthesize(state: AgentState) -> AgentState:
         state["citations"] = []
         return state
 
-    # Build context from chunks
     context_parts = []
     for i, chunk in enumerate(chunks, 1):
         context_parts.append(
@@ -164,25 +146,26 @@ def synthesize(state: AgentState) -> AgentState:
         f"Answer in language: {state['language']}"
     )
 
-    config = Configuration()
-    llm = _get_llm(config.llm_model)
+    cfg = Configuration.from_runnable_config(config)
+    llm = _get_llm(cfg.llm_model)
     messages = [
         SystemMessage(content=SYSTEM_PROMPT),
         HumanMessage(content=user_message),
     ]
-
-    response = llm.invoke(messages)
+    response = await llm.ainvoke(messages)
     state["answer"] = response.content
     state["language_used"] = state["language"]
     return state
 
 
 # ---------------------------------------------------------------------------
-# Node 4: extract_citations
+# Node 5: extract_citations
 # ---------------------------------------------------------------------------
 
 
-def extract_citations(state: AgentState) -> AgentState:
+async def extract_citations(
+    state: AgentState, *, config: Optional[RunnableConfig] = None
+) -> AgentState:
     """
     Build citations from retrieved chunks.
 
@@ -196,7 +179,6 @@ def extract_citations(state: AgentState) -> AgentState:
     citations: list[Citation] = []
     for chunk in state["retrieved_chunks"]:
         body = chunk["body"]
-        # Extract a meaningful excerpt (up to 200 chars, end at word boundary)
         excerpt = body[:200]
         if len(body) > 200:
             last_space = excerpt.rfind(" ")
@@ -212,12 +194,12 @@ def extract_citations(state: AgentState) -> AgentState:
             )
         )
 
-    config = Configuration()
+    cfg = Configuration.from_runnable_config(config)
     state["citations"] = citations
     state["trace"] = {
         "retrieval_count": len(state["retrieved_chunks"]),
         "latency_ms": elapsed_ms,
-        "model": config.llm_model,
+        "model": cfg.llm_model,
     }
     return state
 
@@ -227,11 +209,13 @@ def extract_citations(state: AgentState) -> AgentState:
 # ---------------------------------------------------------------------------
 
 
-def handle_fallback(state: AgentState) -> AgentState:
+async def handle_fallback(
+    state: AgentState, *, config: Optional[RunnableConfig] = None
+) -> AgentState:
     """Return a structured empty response for unsupported scopes."""
     elapsed_ms = int((time.time() - state.get("start_time", time.time())) * 1000)
 
-    config = Configuration()
+    cfg = Configuration.from_runnable_config(config)
     state["answer"] = state.get(
         "fallback_reason", "No content available for your request."
     )
@@ -241,13 +225,13 @@ def handle_fallback(state: AgentState) -> AgentState:
     state["trace"] = {
         "retrieval_count": 0,
         "latency_ms": elapsed_ms,
-        "model": config.llm_model,
+        "model": cfg.llm_model,
     }
     return state
 
 
 # ---------------------------------------------------------------------------
-# Routing function
+# Routing function (sync — routers don't do I/O)
 # ---------------------------------------------------------------------------
 
 

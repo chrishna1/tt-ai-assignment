@@ -1,74 +1,93 @@
 """
-ChromaDB vector store wrapper.
+Vector store retrieval layer.
+
+Public API:
+    make_retriever(config)  — @contextmanager, yields a VectorStoreRetriever
+    retrieve_chunks(...)    — convenience wrapper used by nodes
+    count_documents()       — admin / health check
+    has_content_for(...)    — used by validate_request node
 
 Metadata stored per chunk: content_id, country, language, type, version, title.
 Filtering is applied AT query time (metadata filter passed to ChromaDB query),
 not post-retrieval — this is the multi-tenant isolation guarantee.
 
-Client singleton: ChromaDB 1.5+ raises ValueError if two PersistentClient instances
-are created for the same path with different settings. We solve this by keeping a
-single module-level client and passing it to Chroma(client=...) everywhere.
+ChromaDB singleton:
+    ChromaDB 1.5+ raises ValueError if two PersistentClient instances are
+    created for the same path. We keep one module-level client and reuse it
+    inside every make_retriever() call.
 """
 
 import os
-from typing import Optional
+from contextlib import contextmanager
+from typing import Generator, Optional
 
 import chromadb
-from dotenv import load_dotenv
 from langchain_chroma import Chroma
+from langchain_core.runnables import RunnableConfig
+from langchain_core.vectorstores import VectorStoreRetriever
 from langchain_openai import OpenAIEmbeddings
 
 from src.agent.configuration import Configuration
 
-load_dotenv()
-
 COLLECTION_NAME = "content_corpus"
 CHROMA_PERSIST_DIR = os.getenv("CHROMA_PERSIST_DIR", "./chroma_db")
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
 
-# ── Singletons ────────────────────────────────────────────────────────────────
-# One client for the entire process lifetime. Passed to every Chroma() call so
-# there is never more than one PersistentClient for this path.
+# ── ChromaDB singleton ────────────────────────────────────────────────────────
 _chroma_client: Optional[chromadb.PersistentClient] = None
 
 
 def _get_client(persist_dir: Optional[str] = None) -> chromadb.PersistentClient:
     global _chroma_client
     if _chroma_client is None:
-        path = persist_dir or CHROMA_PERSIST_DIR
-        _chroma_client = chromadb.PersistentClient(path=path)
+        _chroma_client = chromadb.PersistentClient(
+            path=persist_dir or CHROMA_PERSIST_DIR
+        )
     return _chroma_client
 
 
-def _make_embeddings(model: Optional[str] = None) -> OpenAIEmbeddings:
-    return OpenAIEmbeddings(model=model or EMBEDDING_MODEL)
+def _make_embeddings(model: str) -> OpenAIEmbeddings:
+    return OpenAIEmbeddings(model=model)
 
 
-def get_embeddings() -> OpenAIEmbeddings:
-    return _make_embeddings()
+# ── Backend factories ─────────────────────────────────────────────────────────
 
 
-def make_retriever(config: Configuration) -> Chroma:
-    """Factory — returns the configured vector store retriever.
-
-    Currently only ChromaDB is supported. To add another backend,
-    add an elif branch here checking a config field (e.g. config.backend).
-    """
-    # currently only chroma supported
-    return Chroma(
-        client=_get_client(config.chroma_persist_dir),
+@contextmanager
+def _make_chroma_retriever(
+    configuration: Configuration,
+) -> Generator[VectorStoreRetriever, None, None]:
+    vstore = Chroma(
+        client=_get_client(configuration.chroma_persist_dir),
         collection_name=COLLECTION_NAME,
-        embedding_function=_make_embeddings(config.embedding_model),
+        embedding_function=_make_embeddings(configuration.embedding_model),
     )
-
-
-def get_vector_store(config: Optional[Configuration] = None) -> Chroma:
-    """Return a Chroma vector store using the shared client."""
-    cfg = config or Configuration()
-    return make_retriever(cfg)
+    yield vstore.as_retriever(search_kwargs={"k": configuration.retrieval_top_k})
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
+
+
+@contextmanager
+def make_retriever(
+    config: Optional[RunnableConfig] = None,
+) -> Generator[VectorStoreRetriever, None, None]:
+    """Yield a VectorStoreRetriever configured from the LangGraph RunnableConfig.
+
+    Usage::
+
+        with make_retriever(config) as retriever:
+            docs = await retriever.ainvoke(query)
+    """
+    configuration = Configuration.from_runnable_config(config)
+    match configuration.retriever_provider:
+        case "chroma":
+            with _make_chroma_retriever(configuration) as retriever:
+                yield retriever
+        case _:
+            raise ValueError(
+                f"Unsupported retriever_provider: {configuration.retriever_provider!r}. "
+                "Expected: 'chroma'"
+            )
 
 
 def retrieve_chunks(
@@ -76,7 +95,7 @@ def retrieve_chunks(
     country: str,
     language: str,
     top_k: int = 5,
-    config: Optional[Configuration] = None,
+    config: Optional[RunnableConfig] = None,
 ) -> list[dict]:
     """
     Retrieve top-K chunks filtered by country AND language BEFORE similarity ranking.
@@ -85,7 +104,12 @@ def retrieve_chunks(
     inside the ANN search, not after fetching top-K globally. This prevents
     cross-country content from ever entering the result set.
     """
-    store = get_vector_store(config)
+    configuration = Configuration.from_runnable_config(config)
+    vstore = Chroma(
+        client=_get_client(configuration.chroma_persist_dir),
+        collection_name=COLLECTION_NAME,
+        embedding_function=_make_embeddings(configuration.embedding_model),
+    )
 
     where_filter = {
         "$and": [
@@ -94,7 +118,7 @@ def retrieve_chunks(
         ]
     }
 
-    results = store.similarity_search_with_relevance_scores(
+    results = vstore.similarity_search_with_relevance_scores(
         query=query,
         k=top_k,
         filter=where_filter,

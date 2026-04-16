@@ -27,7 +27,8 @@ Graph structure:
 
 from langgraph.graph import END, StateGraph
 
-from src.agent.models import AgentState
+from src.agent.configuration import Configuration
+from src.agent.models import AgentState, InputState
 from src.agent.nodes import (
     extract_citations,
     generate_query,
@@ -40,7 +41,7 @@ from src.agent.nodes import (
 
 
 def build_graph() -> StateGraph:
-    builder = StateGraph(AgentState)
+    builder = StateGraph(AgentState, input=InputState, config_schema=Configuration)
 
     builder.add_node("validate_request", validate_request)
     builder.add_node("generate_query", generate_query)
@@ -71,6 +72,7 @@ def build_graph() -> StateGraph:
 
 # Module-level compiled graph (singleton)
 graph = build_graph()
+graph.name = "MultiCountryQAGraph"
 
 
 async def ask_async(question: str, country: str, language: str) -> dict:
