@@ -28,7 +28,7 @@ import time
 
 from langgraph.graph import StateGraph, END
 
-from src.agent.state import AgentState
+from src.agent.models import AgentState
 from src.agent.nodes import (
     validate_request,
     retrieve,

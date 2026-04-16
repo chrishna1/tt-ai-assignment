@@ -16,7 +16,7 @@ from langchain_anthropic import ChatAnthropic
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from src.agent.state import AgentState, Citation
+from src.agent.models import AgentState, Citation
 from src.db.vector_store import retrieve_chunks, has_content_for
 
 load_dotenv()

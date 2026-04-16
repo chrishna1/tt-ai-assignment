@@ -17,7 +17,7 @@ import os
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
-from pydantic import BaseModel, Field
+from src.api.schema import AskRequest, AskResponse, CitationResponse, TraceResponse
 
 load_dotenv()
 
@@ -32,31 +32,6 @@ app = FastAPI(
     description="RAG-based Q&A system with country/language scoping and citations.",
     version="1.0.0",
 )
-
-class AskRequest(BaseModel):
-    question: str = Field(..., min_length=1, max_length=1000)
-    country: str = Field(..., min_length=1, max_length=10)
-    language: str = Field(..., min_length=2, max_length=10)
-
-
-class CitationResponse(BaseModel):
-    content_id: str
-    type: str
-    excerpt: str
-    match_score: float
-
-
-class TraceResponse(BaseModel):
-    retrieval_count: int
-    latency_ms: int
-    model: str
-
-
-class AskResponse(BaseModel):
-    answer: str
-    language_used: str
-    citations: list[CitationResponse]
-    trace: TraceResponse
 
 
 @app.post("/ingest")
