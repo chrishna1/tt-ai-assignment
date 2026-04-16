@@ -7,23 +7,37 @@ Graph structure:
                       └────────┬────────┘
                                │
               ┌────────────────┼────────────────┐
-              │ fallback?      │ no fallback     │
-              ▼                ▼                 │
-    ┌─────────────────┐  ┌──────────┐           │
-    │ handle_fallback │  │ retrieve │           │
-    └────────┬────────┘  └────┬─────┘           │
-             │                │                  │
-             │           ┌────▼──────┐           │
-             │           │ synthesize│           │
-             │           └────┬──────┘           │
-             │                │                  │
-             │      ┌─────────▼──────────┐       │
-             │      │ extract_citations  │       │
-             │      └─────────┬──────────┘       │
-             │                │                  │
-             └────────────────▼──────────────────┘
-                            END
+              │ Command        │ ok              │
+              │ (no content)   ▼                 │
+              │          ┌──────────────┐        │
+              │          │ generate_query│        │
+              │          └──────┬───────┘        │
+              │                 │                │
+              │          ┌──────▼───────┐        │
+              │          │   retrieve   │        │
+              │          └──────┬───────┘        │
+              │                 │                │
+              │    ┌────────────┴────────────┐   │
+              │    │ Command (no chunks) │ ok │   │
+              ▼    ▼                     ▼   │   │
+    ┌─────────────────┐          ┌──────────┐    │
+    │ handle_fallback │          │ synthesize│    │
+    └────────┬────────┘          └────┬─────┘    │
+             │                        │          │
+             │               ┌────────▼──────┐   │
+             │               │extract_citations│  │
+             │               └────────┬──────┘   │
+             │                        │          │
+             └────────────────────────▼──────────┘
+                                    END
+
+Fallback centralisation:
+  validate_request and retrieve both return Command(goto="handle_fallback")
+  on failure — no flag + router boilerplate. handle_fallback is the single
+  entry point for all failure paths.
 """
+
+import time
 
 from langgraph.graph import END, StateGraph
 
@@ -34,7 +48,6 @@ from src.agent.nodes import (
     generate_query,
     handle_fallback,
     retrieve,
-    route_after_validation,
     synthesize,
     validate_request,
 )
@@ -52,15 +65,9 @@ def build_graph() -> StateGraph:
 
     builder.set_entry_point("validate_request")
 
-    builder.add_conditional_edges(
-        "validate_request",
-        route_after_validation,
-        {
-            "generate_query": "generate_query",
-            "handle_fallback": "handle_fallback",
-        },
-    )
-
+    # validate_request and retrieve use Command for dynamic routing to handle_fallback;
+    # the happy-path edges below cover the non-Command (ok) case.
+    builder.add_edge("validate_request", "generate_query")
     builder.add_edge("generate_query", "retrieve")
     builder.add_edge("retrieve", "synthesize")
     builder.add_edge("synthesize", "extract_citations")
@@ -77,8 +84,6 @@ graph.name = "MultiCountryQAGraph"
 
 async def ask_async(question: str, country: str, language: str) -> dict:
     """Run the agent for a single question. Returns the final AgentState as a plain dict."""
-    import time
-
     initial_state: AgentState = {
         "question": question,
         "country": country,

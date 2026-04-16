@@ -8,18 +8,24 @@ Nodes (in execution order):
   4. synthesize         — LLM call grounded in retrieved chunks
   5. extract_citations  — pull exact excerpts from source docs
 
+Fallback centralisation:
+  All failure paths (invalid scope, no relevant content) route to the single
+  handle_fallback node via Command(goto="handle_fallback"). No flag + router
+  boilerplate needed — Command is the LangGraph-idiomatic dynamic routing tool.
+
 All nodes are async and accept (state, *, config: RunnableConfig) so that
 callers can override Configuration fields per-request via config["configurable"].
 """
 
 import time
-from typing import Literal, Optional
+from typing import Optional
 
 from dotenv import load_dotenv
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_openai import ChatOpenAI
+from langgraph.types import Command
 
 from src.agent.configuration import Configuration
 from src.agent.models import AgentState, Citation
@@ -35,6 +41,14 @@ def _get_llm(model: str):
     return ChatOpenAI(model=model, temperature=0)
 
 
+def _fallback_command(reason: str) -> Command:
+    """Return a Command that routes to handle_fallback with the given reason."""
+    return Command(
+        goto="handle_fallback",
+        update={"fallback_triggered": True, "fallback_reason": reason},
+    )
+
+
 # ---------------------------------------------------------------------------
 # Node 1: validate_request
 # ---------------------------------------------------------------------------
@@ -42,28 +56,21 @@ def _get_llm(model: str):
 
 async def validate_request(
     state: AgentState, *, config: Optional[RunnableConfig] = None
-) -> AgentState:
+) -> Command | AgentState:
     """
     Check whether the requested country/language scope has content in the DB.
 
     Scope is derived dynamically from has_content_for() so no code change is
     needed when a new country/language is added to the corpus.
-
-    Fallback strategy (deliberate choice):
-      - If the country+language combo has no content → fallback with clear message.
-      - We do NOT silently switch languages — the caller explicitly requested one.
     """
     country = state["country"].upper()
     language = state["language"]
 
     state["country"] = country
-    state["fallback_triggered"] = False
-    state["fallback_reason"] = None
     state["start_time"] = time.time()
 
     if not has_content_for(country, language):
-        state["fallback_triggered"] = True
-        state["fallback_reason"] = (
+        return _fallback_command(
             f"No content found in the database for country='{country}', language='{language}'."
         )
 
@@ -97,8 +104,11 @@ async def generate_query(
 
 async def retrieve(
     state: AgentState, *, config: Optional[RunnableConfig] = None
-) -> AgentState:
-    """Metadata-filtered similarity search. Filter is applied INSIDE the ANN query."""
+) -> Command | AgentState:
+    """
+    Metadata-filtered similarity search. Filter is applied INSIDE the ANN query.
+    Routes to handle_fallback if no chunks pass the relevance threshold.
+    """
     cfg = Configuration.from_runnable_config(config)
     chunks = retrieve_chunks(
         query=state.get("search_query") or state["question"],
@@ -107,6 +117,12 @@ async def retrieve(
         top_k=cfg.retrieval_top_k,
         config=config,
     )
+
+    if not chunks:
+        return _fallback_command(
+            "No relevant content found for your question in the available documents."
+        )
+
     state["retrieved_chunks"] = chunks
     return state
 
@@ -120,19 +136,8 @@ async def synthesize(
     state: AgentState, *, config: Optional[RunnableConfig] = None
 ) -> AgentState:
     """Generate a grounded answer using only retrieved chunks as context."""
-    chunks = state["retrieved_chunks"]
-
-    if not chunks:
-        state["answer"] = (
-            "I'm sorry, I could not find relevant information to answer your question "
-            "in the content available for your region."
-        )
-        state["language_used"] = state["language"]
-        state["citations"] = []
-        return state
-
     context_parts = []
-    for i, chunk in enumerate(chunks, 1):
+    for i, chunk in enumerate(state["retrieved_chunks"], 1):
         context_parts.append(
             f"[{i}] Content ID: {chunk['content_id']} | Type: {chunk['type']}\n"
             f"Title: {chunk['title']}\n"
@@ -140,7 +145,7 @@ async def synthesize(
         )
     context = "\n\n---\n\n".join(context_parts)
 
-    user_message = f"Content excerpts:\n\n{context}\n\n Question: {state['question']}"
+    user_message = f"Content excerpts:\n\n{context}\n\nQuestion: {state['question']}"
 
     cfg = Configuration.from_runnable_config(config)
     llm = _get_llm(cfg.llm_model)
@@ -201,17 +206,23 @@ async def extract_citations(
 
 
 # ---------------------------------------------------------------------------
-# Node: handle_fallback
+# Node: handle_fallback  — single entry point for ALL failure paths
 # ---------------------------------------------------------------------------
 
 
 async def handle_fallback(
     state: AgentState, *, config: Optional[RunnableConfig] = None
 ) -> AgentState:
-    """Return a structured empty response for unsupported scopes."""
-    elapsed_ms = int((time.time() - state.get("start_time", time.time())) * 1000)
+    """
+    Unified fallback handler for all failure cases:
+      - unsupported country/language scope  (from validate_request)
+      - no relevant content found           (from retrieve)
 
+    Returns a structured empty response so the API shape stays consistent.
+    """
+    elapsed_ms = int((time.time() - state.get("start_time", time.time())) * 1000)
     cfg = Configuration.from_runnable_config(config)
+
     state["answer"] = state.get(
         "fallback_reason", "No content available for your request."
     )
@@ -224,16 +235,3 @@ async def handle_fallback(
         "model": cfg.llm_model,
     }
     return state
-
-
-# ---------------------------------------------------------------------------
-# Routing function (sync — routers don't do I/O)
-# ---------------------------------------------------------------------------
-
-
-def route_after_validation(
-    state: AgentState,
-) -> Literal["generate_query", "handle_fallback"]:
-    if state.get("fallback_triggered"):
-        return "handle_fallback"
-    return "generate_query"
