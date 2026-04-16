@@ -28,7 +28,7 @@ import time
 
 from langgraph.graph import StateGraph, END
 
-from src.agent.models import AgentState
+from src.agent.models import AgentState, InputState
 from src.agent.nodes import (
     validate_request,
     retrieve,
@@ -75,12 +75,14 @@ def ask(question: str, country: str, language: str) -> dict:
     """
     Run the agent for a single question.
 
+    InputState is the public interface — callers supply question, country, language.
     Returns the final AgentState as a plain dict.
     """
     initial_state: AgentState = {
         "question": question,
         "country": country,
         "language": language,
+        "search_query": "",
         "retrieved_chunks": [],
         "fallback_triggered": False,
         "fallback_reason": None,

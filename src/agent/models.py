@@ -2,6 +2,7 @@
 Internal data models used by the LangGraph agent.
 
 Citation and Trace are the core value objects produced by the agent.
+InputState is the public API boundary (caller-facing fields).
 AgentState is the full LangGraph state passed between nodes.
 """
 from typing import Optional
@@ -21,13 +22,21 @@ class Trace(TypedDict):
     model: str
 
 
+class InputState(TypedDict):
+    """Public API boundary — the fields callers must supply."""
+    question: str
+    country: str
+    language: str
+
+
 class AgentState(TypedDict):
-    # Inputs
+    # Inputs (same as InputState — duplicated for Python 3.9 compatibility)
     question: str
     country: str
     language: str
 
     # Intermediate
+    search_query: str
     retrieved_chunks: list
     fallback_triggered: bool
     fallback_reason: Optional[str]
