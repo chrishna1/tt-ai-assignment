@@ -5,6 +5,23 @@ With the advent of LLM we can solve this problem. Users can ask their query in n
 
 This is a small working POC for customer-domain platform for that'll be used by multi-country B2B retail business to help end users get support resolved quickly. We've corpus of official content provided. We're using Claude models for LLM calls, OpenAI for emmbedding, Chroma for vector storage, FastAPI for api layer.
 
+## Table of Contents
+
+- [Overall Architecture](#overall-architecture)
+- [Graph Structure](#graph-structure)
+- [Screenshots](#screenshots)
+- [Setup](#setup)
+  - [Prerequisites](#prerequisites)
+  - [Install](#install)
+  - [Ingest corpus + start server](#ingest-corpus--start-server)
+  - [Start server only](#start-server-only-corpus-already-ingested)
+- [Example Requests](#example-requests)
+- [Country Isolation Proof](#country-isolation-proof)
+- [Run Evaluation Harness](#run-evaluation-harness)
+- [Run Unit Tests](#run-unit-tests)
+- [What I Would Do Next With More Time](#what-i-would-do-next-with-more-time)
+- [Known Limitations](#known-limitations)
+
 ---
 
 ## Overall Architecture
@@ -175,3 +192,22 @@ uv run pytest tests/ -v
 - No request caching. Every `/ask` call hits the embedding model and LLM. A TTL cache keyed on `(question, country, language)` would cut cost and latency significantly for repeated queries.
 
 - Nodes are sync at the DB layer. `retrieve_chunks()` calls ChromaDB synchronously inside an async node. ChromaDB has no async client; a thread-pool executor would prevent event-loop blocking under load.
+
+---
+
+## Screenshots
+
+**API request / response**
+![API request/response](screenshots/01_api_request_response.png)
+
+**Multi-tenant isolation**
+![Multi-tenant isolation](screenshots/02_multi_tenant_isolation.png)
+
+**LangGraph state graph**
+![LangGraph graph](screenshots/03_langgraph_graph.png)
+
+**Vector DB sample**
+![Vector DB sample](screenshots/04_vector_db_sample.png)
+
+**Evaluation harness output**
+![Evaluation output](screenshots/05_evaluation_output.png)
