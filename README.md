@@ -176,12 +176,13 @@ uv run pytest tests/ -v
 
 - Multi-turn conversation.
 
-- LangGraph persistence(to allow users to )
+- LangGraph persistence(to allow users to resume the session from where they left off)
 
 - Retrieval grading (CRAG).
 
 - Sub-document chunking.
 
+- Improve latency, right now it takes 3-4+ seconds.
 
 ## Known Limitations
 
