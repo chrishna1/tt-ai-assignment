@@ -3,7 +3,7 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "tt-pepsi-ai-assignment"
+name = "tt-ai-assignment"
 version = "0.1.0"
 description = "Multi-Country Content Q&A with Citations — LangGraph RAG system"
 requires-python = ">=3.9"

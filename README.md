@@ -61,7 +61,7 @@ source - [docs/architecture.drawio](docs/architecture.drawio)
 
 ```bash
 git clone <your-repo>
-cd tt-pepsi-ai-assignment
+cd tt-ai-assignment
 cp .env.example .env
 # update keys in .env:
 uv sync
