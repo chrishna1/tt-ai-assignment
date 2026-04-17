@@ -1,42 +1,3 @@
-"""
-LangGraph agent graph definition.
-
-Graph structure:
-                      ┌─────────────────┐
-                      │ validate_request │
-                      └────────┬────────┘
-                               │
-              ┌────────────────┼────────────────┐
-              │ Command        │ ok              │
-              │ (no content)   ▼                 │
-              │          ┌──────────────┐        │
-              │          │ generate_query│        │
-              │          └──────┬───────┘        │
-              │                 │                │
-              │          ┌──────▼───────┐        │
-              │          │   retrieve   │        │
-              │          └──────┬───────┘        │
-              │                 │                │
-              │    ┌────────────┴────────────┐   │
-              │    │ Command (no chunks) │ ok │   │
-              ▼    ▼                     ▼   │   │
-    ┌─────────────────┐          ┌──────────┐    │
-    │ handle_fallback │          │ synthesize│    │
-    └────────┬────────┘          └────┬─────┘    │
-             │                        │          │
-             │               ┌────────▼──────┐   │
-             │               │extract_citations│  │
-             │               └────────┬──────┘   │
-             │                        │          │
-             └────────────────────────▼──────────┘
-                                    END
-
-Fallback centralisation:
-  validate_request and retrieve both return Command(goto="handle_fallback")
-  on failure — no flag + router boilerplate. handle_fallback is the single
-  entry point for all failure paths.
-"""
-
 import time
 
 from langgraph.graph import END, StateGraph
@@ -49,6 +10,7 @@ from src.agent.nodes import (
     handle_fallback,
     retrieve,
     synthesize,
+    topic_guard,
     validate_request,
 )
 
@@ -57,6 +19,7 @@ def build_graph() -> StateGraph:
     builder = StateGraph(AgentState, input=InputState, config_schema=Configuration)
 
     builder.add_node("validate_request", validate_request)
+    builder.add_node("topic_guard", topic_guard)
     builder.add_node("generate_query", generate_query)
     builder.add_node("retrieve", retrieve)
     builder.add_node("synthesize", synthesize)
@@ -65,8 +28,8 @@ def build_graph() -> StateGraph:
 
     builder.set_entry_point("validate_request")
 
-    # validate_request and retrieve always return Command (no static edges from them).
-    # Mixing static edges with Command causes both to be followed — avoid it.
+    # validate_request, topic_guard, and retrieve always return Command.
+    # Only static edges for nodes that return plain state dicts.
     builder.add_edge("generate_query", "retrieve")
     builder.add_edge("synthesize", "extract_citations")
     builder.add_edge("extract_citations", END)

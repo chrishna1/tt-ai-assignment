@@ -1,48 +1,53 @@
 # Multi-Country Content Q&A with Citations
 
-A RAG-based question-answering system for a multi-country B2B retail platform. Given a natural-language question, a country, and a language, it returns a grounded answer sourced exclusively from that country's official content — with verifiable citations pointing back to the exact source items.
+No one has the patience to through long articles these days. Either users directly try to reach customer support or they end up being frustated.
+With the advent of LLM we can solve this problem. Users can ask their query in natural language and we'll respond to them in natural language with the response that's grounded in the official content.
+
+This is a small working POC for customer-domain platform for that'll be used by multi-country B2B retail business to help end users get support resolved quickly. We've corpus of official content provided. We're using Claude models for LLM calls, OpenAI for emmbedding, Chroma for vector storage, FastAPI for api layer.
 
 ---
 
-## Architecture
+## Overall Architecture
 
-```mermaid
-flowchart TD
-    A[POST /ask\nquestion + country + language] --> B[FastAPI Server]
-    B --> C[LangGraph Agent]
+![Architecture Diagram](docs/architecture.drawio.png)
 
-    C --> D[validate_request\nCheck country/language scope exists]
-    D -- scope invalid --> E[handle_fallback\nReturn empty + reason]
-    D -- scope valid --> F[retrieve\nChromaDB filtered similarity search\ncountry + language filter BEFORE ANN]
-    F --> G[synthesize\nLLM grounded answer\nusing ONLY retrieved chunks]
-    G --> H[extract_citations\nExcerpt from source body\n+ match_score]
-    H --> I[Response\nanswer + citations + trace]
-    E --> I
-```
+source - [docs/architecture.drawio](docs/architecture.drawio)
+
+## Graph structure
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    HTTP Layer (FastAPI)                   │
-│  POST /ask  →  validates input  →  invokes agent         │
-└──────────────────────┬──────────────────────────────────┘
-                       │
-┌──────────────────────▼──────────────────────────────────┐
-│               LangGraph Agent (4 nodes)                  │
-│                                                          │
-│  validate_request ──► retrieve ──► synthesize            │
-│       │                                ▼                 │
-│       └──(fallback)──► handle_fallback extract_citations │
-└──────────────────────────────────────────────────────────┘
-                       │
-┌──────────────────────▼──────────────────────────────────┐
-│                  ChromaDB (local)                        │
-│  Metadata per doc: content_id, country, language,        │
-│  type, version, title                                    │
-│  Filter applied AT query time (not post-retrieval)       │
-└─────────────────────────────────────────────────────────┘
+                      ┌─────────────────┐
+                      │ validate_request│
+                      └────────┬────────┘
+                               │ Command(ok)
+                      ┌────────▼────────┐
+                      │   topic_guard   │
+                      └────────┬────────┘
+                               │
+              ┌────────────────┼─────────────────┐
+              │ Command        │ Command(ok)      │
+              │ (off-topic)    ▼                  │
+              │        ┌──────────────┐           │
+              │        │generate_query│           │
+              │        └──────┬───────┘           │
+              │               │                   │
+              │        ┌──────▼───────┐           │
+              │        │   retrieve   │           │
+              │        └──────┬───────┘           │
+              │               │                   │
+              │  ┌────────────┴──────────┐        │
+              │  │ Command(no chunks) ok │        │
+              ▼  ▼                   ▼            │
+    ┌─────────────────┐       ┌──────────┐        │
+    │ handle_fallback │       │synthesize│        │
+    └────────┬────────┘       └────┬─────┘        │
+             │                     │              │
+             │            ┌────────▼──────┐       │
+             │            │extract citation│      │
+             │            └────────┬──────┘       │
+             └────────────────────▼───────────────┘
+                                 END
 ```
-
-**Multi-tenant isolation guarantee**: The `retrieve` node passes a `where` filter `{country: X, language: Y}` directly to ChromaDB's ANN query. Content from other countries never enters the candidate set — it is excluded before similarity scoring, not after.
 
 ---
 
@@ -50,113 +55,81 @@ flowchart TD
 
 ### Prerequisites
 
-- Python 3.10+
-- Your own Anthropic or OpenAI API key (bring your own)
-- No external services required — ChromaDB runs locally
+- [uv](https://docs.astral.sh/uv/) (`brew install uv` or `pip install uv`)
 
 ### Install
 
 ```bash
 git clone <your-repo>
 cd tt-pepsi-ai-assignment
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-```
-
-### Configure
-
-```bash
 cp .env.example .env
-# Edit .env and add your API key:
-# ANTHROPIC_API_KEY=sk-ant-...  OR  OPENAI_API_KEY=sk-...
-# Set LLM_MODEL accordingly (see .env.example)
+# update keys in .env:
+uv sync
 ```
 
-### Run (single command)
+### Ingest corpus + start server
 
 ```bash
+# Ingest the sample corpus and start the API server
 bash start.sh
-# Or with DB reset:
+
+# Re-ingest with a clean slate
 bash start.sh --reset
 ```
 
-This will:
-1. Start the FastAPI server on `http://localhost:8000`
-2. POST `corpus.jsonl` to the `/ingest` endpoint to embed it into ChromaDB
+`start.sh` runs `ingest.py` first (embeds `corpus.jsonl` into ChromaDB), then starts uvicorn on `http://localhost:8000`.
 
-### Ingest manually via the API
+### Start server only (corpus already ingested)
 
 ```bash
-# Default corpus
-curl -X POST http://localhost:8000/ingest \
-  -F "file=@corpus.jsonl" \
-  -F "reset=false"
-
-# Re-ingest a different file and wipe existing data
-curl -X POST http://localhost:8000/ingest \
-  -F "file=@my_corpus.jsonl" \
-  -F "reset=true"
-```
-
-Response:
-```json
-{ "status": "ok", "ingested": 44, "breakdown": { "A/en": 7, "A/hi": 5, ... } }
-```
-
-### Or ingest via CLI (no server needed)
-
-```bash
-python ingest.py --corpus corpus.jsonl --reset
+uv run uvicorn src.api.server:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 ---
 
 ## Example Requests
 
-### Country B, Spanish — account closure
+### Ask a question — Country B, Spanish corpus
 
 ```bash
 curl -X POST http://localhost:8000/ask \
   -H "Content-Type: application/json" \
-  -d '{"question": "Can I cancel my account if I have pending orders?", "country": "B", "language": "es"}'
+  -d '{
+    "question": "Can I cancel my account if I have pending orders?",
+    "country": "B",
+    "language": "es"
+  }'
 ```
 
-Expected response shape:
-```json
-{
-  "answer": "Puede solicitar el cierre de cuenta en cualquier momento...",
-  "language_used": "es",
-  "citations": [
-    {
-      "content_id": "b_faq_account_es",
-      "type": "FAQ",
-      "excerpt": "Puede solicitar el cierre de cuenta en cualquier momento...",
-      "match_score": 0.87
-    }
-  ],
-  "trace": {
-    "retrieval_count": 3,
-    "latency_ms": 840,
-    "model": "claude-haiku-4-5-20251001"
-  }
-}
-```
-
-### Multi-tenant isolation test — Country A asking in Spanish
+### Ask in Hindi — Country A
 
 ```bash
 curl -X POST http://localhost:8000/ask \
   -H "Content-Type: application/json" \
-  -d '{"question": "¿Cuál es su política de devoluciones?", "country": "A", "language": "es"}'
+  -d '{
+    "question": "आपकी वापसी नीति क्या है?",
+    "country": "A",
+    "language": "hi"
+  }'
 ```
 
-Expected: empty citations, fallback message. Country B Spanish content must NOT appear.
+### Isolation test — Country A asking in Spanish (no Spanish content exists for A)
+
+```bash
+curl -X POST http://localhost:8000/ask \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "¿Cuál es su política de devoluciones?",
+    "country": "A",
+    "language": "es"
+  }'
+```
 
 ### Health check
 
 ```bash
 curl http://localhost:8000/health
+# {"status": "ok", "collection_size": 44}
 ```
 
 ---
@@ -164,58 +137,41 @@ curl http://localhost:8000/health
 ## Run Evaluation Harness
 
 ```bash
-python eval/run_eval.py
+uv run python eval/run_eval.py           # 10 test cases, pass/fail summary
+uv run python eval/run_eval.py --verbose # includes answer text + trace per case
 ```
 
-Runs 10 test questions (mix of languages, countries, isolation tests). Outputs pass/fail per case.
+Covers: 4 countries × multiple languages, cross-language isolation tests, pending-order edge cases.
 
 ## Run Unit Tests
 
 ```bash
-pytest tests/ -v
+uv run pytest tests/ -v
 ```
+
 
 ---
 
-## Project Structure
-
-```
-tt-pepsi-ai-assignment/
-├── corpus.jsonl              # 44-item sample corpus (JSONL)
-├── ingest.py                 # Ingestion script: embed corpus → ChromaDB
-├── start.sh                  # Single command: ingest + serve
-├── requirements.txt
-├── .env.example
-├── src/
-│   ├── agent/
-│   │   ├── graph.py          # LangGraph graph definition + ask() entry point
-│   │   ├── nodes.py          # Node implementations (validate, retrieve, synthesize, cite)
-│   │   └── state.py          # AgentState TypedDict
-│   ├── api/
-│   │   └── server.py         # FastAPI app (POST /ask, GET /health)
-│   └── db/
-│       └── vector_store.py   # ChromaDB wrapper + retrieve_chunks()
-├── eval/
-│   └── run_eval.py           # Evaluation harness (10 test questions)
-├── tests/
-│   └── test_core.py          # Unit tests (filtering, citations, ranking)
-└── screenshots/              # Visual evidence of working system
-```
-
----
-
-## Known Limitations
-
-- **No sub-chunking**: Each corpus item is stored as a single document. For longer documents this reduces precision; a sliding-window chunker would improve citation granularity. The corpus items are short enough that this is acceptable for the prototype.
-- **Excerpt length**: Citations show the first ~200 characters of the source body. The full body is used for retrieval and synthesis; only the excerpt display is truncated.
-- **Fallback is "return empty"**: When a caller requests a language not available in their country, the system returns an empty citations list with an explanation rather than falling back to another language. This avoids silently answering in a different language than requested.
-- **No caching**: Every request hits the LLM. A simple TTL cache on (question, country, language) would reduce cost and latency in practice.
-- **Single-node ChromaDB**: Production would need a persistent, replicated vector store (pgvector or managed Qdrant).
 
 ## What I Would Do Next With More Time
 
-1. **Sub-document chunking**: Split long T&C bodies into paragraphs with overlap for finer-grained citations.
-2. **Reranker**: Add a cross-encoder reranker between retrieval and synthesis to improve citation precision.
-3. **Query translation**: If a user asks in a language that exists in their country but is not their question language, translate the query before embedding to improve recall.
-4. **Streaming**: Return the answer as a stream to reduce perceived latency.
-5. **Observability**: Structured logs per request with country, language, latency, token cost.
+- Streaming response.
+
+- Multi-turn conversation.
+
+- LangGraph persistence(to allow users to )
+
+- Retrieval grading (CRAG).
+
+- Sub-document chunking.
+
+
+## Known Limitations
+
+- Right now excerpt is always the first 200 chars of the body but it is not necessarily the most semantically relevant sentence.
+
+- Single-node ChromaDB. The vector store runs in-process on local disk. Production would need a replicated persistent store (pgvector, Qdrant Cloud, etc.).
+
+- No request caching. Every `/ask` call hits the embedding model and LLM. A TTL cache keyed on `(question, country, language)` would cut cost and latency significantly for repeated queries.
+
+- Nodes are sync at the DB layer. `retrieve_chunks()` calls ChromaDB synchronously inside an async node. ChromaDB has no async client; a thread-pool executor would prevent event-loop blocking under load.

@@ -28,8 +28,9 @@ from langchain_openai import ChatOpenAI
 from langgraph.types import Command
 
 from src.agent.configuration import Configuration
+from src.agent.constants import MSG_FALLBACK_DEFAULT, MSG_NO_CONTENT, MSG_OFF_TOPIC
 from src.agent.models import AgentState, Citation
-from src.agent.prompts import QUERY_REWRITE_PROMPT, SYSTEM_PROMPT
+from src.agent.prompts import QUERY_REWRITE_PROMPT, SYSTEM_PROMPT, TOPIC_GUARD_PROMPT
 from src.db.vector_store import retrieve_chunks
 
 load_dotenv()
@@ -50,7 +51,7 @@ def _fallback_command(reason: str) -> Command:
 
 
 # ---------------------------------------------------------------------------
-# Node 1: validate_request
+# Node: validate_request
 # ---------------------------------------------------------------------------
 
 
@@ -73,7 +74,37 @@ async def validate_request(
 
 
 # ---------------------------------------------------------------------------
-# Node 2: generate_query
+# Node: topic_guard
+# ---------------------------------------------------------------------------
+
+
+async def topic_guard(
+    state: AgentState, *, config: Optional[RunnableConfig] = None
+) -> Command:
+    """
+    Classify whether the question is relevant to the B2B retail domain.
+    Off-topic questions (e.g. 'when is my marriage?') are rejected before
+    retrieval — saving an embedding call and an LLM synthesis call.
+
+    Always returns Command (no static edges from this node).
+    """
+    cfg = Configuration.from_runnable_config(config)
+    llm = _get_llm(cfg.llm_model)
+    messages = [
+        SystemMessage(content=TOPIC_GUARD_PROMPT),
+        HumanMessage(content=state["question"]),
+    ]
+    response = await llm.ainvoke(messages)
+    verdict = response.content.strip().upper()
+
+    if verdict != "RELEVANT":
+        return _fallback_command(MSG_OFF_TOPIC)
+
+    return Command(goto="generate_query")
+
+
+# ---------------------------------------------------------------------------
+# Node: generate_query
 # ---------------------------------------------------------------------------
 
 
@@ -93,7 +124,7 @@ async def generate_query(
 
 
 # ---------------------------------------------------------------------------
-# Node 3: retrieve
+# Node: retrieve
 # ---------------------------------------------------------------------------
 
 
@@ -117,15 +148,13 @@ async def retrieve(
     )
 
     if not chunks:
-        return _fallback_command(
-            "No relevant content found for your question in the available documents."
-        )
+        return _fallback_command(MSG_NO_CONTENT)
 
     return Command(goto="synthesize", update={"retrieved_chunks": chunks})
 
 
 # ---------------------------------------------------------------------------
-# Node 4: synthesize
+# Node: synthesize
 # ---------------------------------------------------------------------------
 
 
@@ -157,7 +186,7 @@ async def synthesize(
 
 
 # ---------------------------------------------------------------------------
-# Node 5: extract_citations
+# Node: extract_citations
 # ---------------------------------------------------------------------------
 
 
@@ -220,9 +249,7 @@ async def handle_fallback(
     elapsed_ms = int((time.time() - state.get("start_time", time.time())) * 1000)
     cfg = Configuration.from_runnable_config(config)
 
-    state["answer"] = state.get(
-        "fallback_reason", "No content available for your request."
-    )
+    state["answer"] = state.get("fallback_reason", MSG_FALLBACK_DEFAULT)
     state["language_used"] = state["language"]
     state["citations"] = []
     state["retrieved_chunks"] = []

@@ -1,0 +1,194 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Architecture" id="arch-main">
+    <mxGraphModel dx="1719" dy="1011" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" parent="1" style="text;html=1;fontSize=18;fontStyle=1;align=center;fillColor=none;strokeColor=none;fontColor=#1a1a2e;" value="Multi-Country Content Q&amp;A — RAG Architecture" vertex="1">
+          <mxGeometry height="36" width="1000" x="200" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="ext-layer" parent="1" style="swimlane;html=1;fontSize=11;fontStyle=1;fillColor=#e1d5e7;strokeColor=#9673a6;startSize=28;swimlaneLine=1;" value="&lt;font style=&quot;font-size: 18px;&quot;&gt;External Services&lt;/font&gt;" vertex="1">
+          <mxGeometry height="220" width="230" x="1300" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="llm-box" parent="ext-layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" value="&lt;b&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;LLM&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;i&gt;&lt;font style=&quot;font-size: 18px;&quot;&gt;(Claude)&lt;/font&gt;&amp;nbsp;&lt;/i&gt;" vertex="1">
+          <mxGeometry height="50" width="200" x="15" y="45" as="geometry" />
+        </mxCell>
+        <mxCell id="embeddings" parent="ext-layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" value="&lt;b&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;OpenAI Embeddings&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;i&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;text-embedding-3-small&lt;/font&gt;&lt;/i&gt;" vertex="1">
+          <mxGeometry height="50" width="200" x="15" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="api-layer" parent="1" style="swimlane;html=1;fontSize=11;fontStyle=1;fillColor=#dae8fc;strokeColor=#6c8ebf;startSize=28;" value="&lt;font style=&quot;font-size: 18px;&quot;&gt;Transport&lt;/font&gt;" vertex="1">
+          <mxGeometry height="110" width="450" x="190" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="fastapi" parent="api-layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" value="&lt;b&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;FastAPI&lt;/font&gt;&lt;/b&gt;&lt;br&gt;/ask endpoint" vertex="1">
+          <mxGeometry height="50" width="170" x="20" y="42" as="geometry" />
+        </mxCell>
+        <mxCell id="pydantic" parent="api-layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999;fontSize=11;" value="&lt;b&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;Pydantic&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size: 12px;&quot;&gt;AskRequest validator&lt;/font&gt;" vertex="1">
+          <mxGeometry height="50" width="170" x="250" y="42" as="geometry" />
+        </mxCell>
+        <mxCell id="e-api-pydantic" edge="1" parent="api-layer" source="fastapi" style="edgeStyle=orthogonalEdgeStyle;html=1;" target="pydantic" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="agent-layer" parent="1" style="swimlane;html=1;fontSize=11;fontStyle=1;fillColor=#d5e8d4;strokeColor=#82b366;startSize=28;" value="&lt;font style=&quot;font-size: 18px;&quot;&gt;LangGraph Agent  ·  src/agent/&lt;/font&gt;" vertex="1">
+          <mxGeometry height="480" width="1060" x="190" y="240" as="geometry" />
+        </mxCell>
+        <mxCell id="n-validate" parent="agent-layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;fontStyle=1;" value="&lt;font style=&quot;font-size: 18px;&quot;&gt;Validate request&lt;/font&gt;" vertex="1">
+          <mxGeometry height="44" width="180" x="30" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="n-topicguard" parent="agent-layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;fontStyle=1;" value="&lt;font style=&quot;font-size: 18px;&quot;&gt;Topic guard&lt;/font&gt;" vertex="1">
+          <mxGeometry height="44" width="180" x="30" y="160" as="geometry" />
+        </mxCell>
+        <mxCell id="n-genquery" parent="agent-layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;fontStyle=1;" value="&lt;font style=&quot;font-size: 18px;&quot;&gt;Generate query&lt;/font&gt;" vertex="1">
+          <mxGeometry height="44" width="180" x="30" y="260" as="geometry" />
+        </mxCell>
+        <mxCell id="n-retrieve" parent="agent-layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;fontStyle=1;" value="&lt;font style=&quot;font-size: 18px;&quot;&gt;Retrieve&lt;/font&gt;" vertex="1">
+          <mxGeometry height="44" width="180" x="30" y="360" as="geometry" />
+        </mxCell>
+        <mxCell id="n-synthesize" parent="agent-layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;fontStyle=1;" value="&lt;font style=&quot;font-size: 18px;&quot;&gt;Generate&lt;/font&gt;" vertex="1">
+          <mxGeometry height="44" width="180" x="310" y="404" as="geometry" />
+        </mxCell>
+        <mxCell id="n-citations" parent="agent-layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;fontStyle=1;" value="&lt;font style=&quot;font-size: 18px;&quot;&gt;Extract citations&lt;/font&gt;" vertex="1">
+          <mxGeometry height="44" width="180" x="530" y="404" as="geometry" />
+        </mxCell>
+        <mxCell id="n-fallback" parent="agent-layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d6b656;fontSize=12;fontStyle=1;" value="&lt;font style=&quot;font-size: 18px;&quot;&gt;Handle fallback&lt;/font&gt;" vertex="1">
+          <mxGeometry height="44" width="180" x="780" y="210" as="geometry" />
+        </mxCell>
+        <mxCell id="n-end" parent="agent-layer" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=13;fontStyle=1;" value="END" vertex="1">
+          <mxGeometry height="44" width="100" x="820" y="370" as="geometry" />
+        </mxCell>
+        <mxCell id="e-val-guard" edge="1" parent="agent-layer" source="n-validate" style="edgeStyle=orthogonalEdgeStyle;html=1;" target="n-topicguard" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-guard-gen" edge="1" parent="agent-layer" source="n-topicguard" style="edgeStyle=orthogonalEdgeStyle;html=1;" target="n-genquery" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-gen-ret" edge="1" parent="agent-layer" source="n-genquery" style="edgeStyle=orthogonalEdgeStyle;html=1;" target="n-retrieve" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-ret-synth" edge="1" parent="agent-layer" source="n-retrieve" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="n-synthesize" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="270" y="382" />
+              <mxPoint x="270" y="426" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-synth-cite" edge="1" parent="agent-layer" source="n-synthesize" style="edgeStyle=orthogonalEdgeStyle;html=1;" target="n-citations" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-cite-end" edge="1" parent="agent-layer" source="n-citations" style="edgeStyle=orthogonalEdgeStyle;html=1;" target="n-end" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="680" y="382" />
+              <mxPoint x="870" y="382" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-fallback-end" edge="1" parent="agent-layer" source="n-fallback" style="edgeStyle=orthogonalEdgeStyle;html=1;" target="n-end" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-guard-fb" edge="1" parent="agent-layer" source="n-topicguard" style="edgeStyle=orthogonalEdgeStyle;html=1;dashed=1;strokeColor=#CC0000;fontColor=#CC0000;fontSize=10;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.3;entryDx=0;entryDy=0;" target="n-fallback" value="off-topic">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="600" y="182" />
+              <mxPoint x="600" y="223" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-ret-fb" edge="1" parent="agent-layer" source="n-retrieve" style="edgeStyle=orthogonalEdgeStyle;html=1;dashed=1;strokeColor=#CC0000;fontColor=#CC0000;fontSize=10;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.7;entryDx=0;entryDy=0;" target="n-fallback" value="no chunks">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="600" y="382" />
+              <mxPoint x="600" y="241" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="1s2dA0Jhz4_tvP6lLmU7-8" edge="1" parent="agent-layer" style="edgeStyle=orthogonalEdgeStyle;html=1;" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1160" y="390" />
+              <mxPoint x="1160" y="680" />
+              <mxPoint x="-120" y="680" />
+            </Array>
+            <mxPoint x="920" y="390" as="sourcePoint" />
+            <mxPoint x="-120" y="-30" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-guard-llm" edge="1" parent="1" source="n-topicguard" style="dashed=1;html=1;strokeColor=#9673a6;exitX=0.5;exitY=0;exitDx=0;exitDy=0;" target="llm-box" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-gen-llm" edge="1" parent="1" source="n-genquery" style="dashed=1;html=1;strokeColor=#9673a6;exitX=0.5;exitY=0;exitDx=0;exitDy=0;" target="llm-box" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-synth-llm" edge="1" parent="1" source="n-synthesize" style="dashed=1;html=1;strokeColor=#9673a6;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" target="llm-box" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-ret-embed" edge="1" parent="1" source="n-retrieve" style="dashed=1;html=1;strokeColor=#9673a6;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" target="embeddings" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="db-layer" parent="1" style="swimlane;html=1;fontSize=11;fontStyle=1;fillColor=#f8cecc;strokeColor=#b85450;startSize=28;" value="&lt;font style=&quot;font-size: 18px;&quot;&gt;Vector Store&lt;/font&gt;" vertex="1">
+          <mxGeometry height="130" width="700" x="190" y="780" as="geometry" />
+        </mxCell>
+        <mxCell id="chromadb" parent="db-layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" value="&lt;b&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;ChromaDB&amp;nbsp;&lt;/font&gt;&lt;/b&gt;(with cosine ANN)" vertex="1">
+          <mxGeometry height="55" width="650" x="20" y="45" as="geometry" />
+        </mxCell>
+        <mxCell id="ingest-layer" parent="1" style="swimlane;html=1;fontSize=11;fontStyle=1;fillColor=#fff2cc;strokeColor=#d6b656;startSize=28;" value="&lt;font style=&quot;font-size: 18px;&quot;&gt;Ingest  (offline)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="130" width="310" x="940" y="780" as="geometry" />
+        </mxCell>
+        <mxCell id="ingest-node" parent="ingest-layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" value="&lt;b&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;ingest.py&lt;/font&gt;&lt;/b&gt;&lt;br&gt;parse · embed · upsert · --reset" vertex="1">
+          <mxGeometry height="55" width="260" x="20" y="45" as="geometry" />
+        </mxCell>
+        <mxCell id="e-client-api" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;html=1;fontSize=10;" target="fastapi" value="HTTP">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="80" y="150" as="sourcePoint" />
+            <mxPoint x="253" y="120" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-api-validate" edge="1" parent="1" source="fastapi" style="edgeStyle=orthogonalEdgeStyle;html=1;" target="n-validate" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-ret-chroma" edge="1" parent="1" source="n-retrieve" style="edgeStyle=orthogonalEdgeStyle;html=1;" target="chromadb" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-ingest-chroma" edge="1" parent="1" source="ingest-node" style="edgeStyle=orthogonalEdgeStyle;html=1;fontSize=10;" target="chromadb" value="upsert">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-ingest-embed" edge="1" parent="1" source="ingest-node" style="dashed=1;html=1;strokeColor=#9673a6;fontSize=10;" target="embeddings" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-box" parent="1" style="swimlane;html=1;fontSize=11;fontStyle=1;fillColor=#f5f5f5;strokeColor=#999;startSize=28;" value="&lt;font style=&quot;font-size: 18px;&quot;&gt;Legend&lt;/font&gt;" vertex="1">
+          <mxGeometry height="140" width="240" x="1300" y="340" as="geometry" />
+        </mxCell>
+        <mxCell id="leg-e1" edge="1" parent="legend-box" style="edgeStyle=orthogonalEdgeStyle;html=1;fontSize=10;" value="Normal flow">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="20" y="64" as="sourcePoint" />
+            <mxPoint x="120" y="64" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="leg-l1" parent="legend-box" style="text;html=1;fontSize=10;fillColor=none;strokeColor=none;align=left;" value="&lt;font style=&quot;font-size: 14px;&quot;&gt;Normal flow&lt;/font&gt;" vertex="1">
+          <mxGeometry height="20" width="100" x="125" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="leg-e2" edge="1" parent="legend-box" style="edgeStyle=orthogonalEdgeStyle;html=1;dashed=1;strokeColor=#CC0000;" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="20" y="99" as="sourcePoint" />
+            <mxPoint x="120" y="99" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="leg-l2" parent="legend-box" style="text;html=1;fontSize=10;fillColor=none;strokeColor=none;align=left;" value="&lt;font style=&quot;font-size: 14px;&quot;&gt;Fallback&lt;/font&gt;" vertex="1">
+          <mxGeometry height="20" width="100" x="125" y="85" as="geometry" />
+        </mxCell>
+        <mxCell id="leg-e3" edge="1" parent="legend-box" style="dashed=1;html=1;strokeColor=#9673a6;" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="20" y="128" as="sourcePoint" />
+            <mxPoint x="120" y="128" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="leg-l3" parent="legend-box" style="text;html=1;fontSize=10;fillColor=none;strokeColor=none;align=left;" value="&lt;font style=&quot;font-size: 14px;&quot;&gt;External call&lt;/font&gt;" vertex="1">
+          <mxGeometry height="20" width="100" x="125" y="115" as="geometry" />
+        </mxCell>
+        <mxCell id="1s2dA0Jhz4_tvP6lLmU7-1" parent="1" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;" value="&lt;font style=&quot;font-size: 18px;&quot;&gt;&lt;b style=&quot;&quot;&gt;Client&lt;/b&gt;&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="30" x="50" y="105" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
